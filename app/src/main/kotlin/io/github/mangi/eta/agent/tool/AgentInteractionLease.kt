@@ -49,7 +49,7 @@ internal class AgentInteractionLeaseCoordinator {
                     // Notify outside the monitor: UI observers must never delay lease release.
                     if (!announcedWaiting) {
                         announcedWaiting = true
-                        onWaiting(true)
+                        runCatching { onWaiting(true) }
                     }
                     synchronized(monitor) {
                         try {
@@ -61,7 +61,7 @@ internal class AgentInteractionLeaseCoordinator {
                     }
                 }
             } finally {
-                if (announcedWaiting) onWaiting(false)
+                if (announcedWaiting) runCatching { onWaiting(false) }
                 synchronized(monitor) {
                     if (waiters.remove(this)) monitor.notifyAll()
                 }

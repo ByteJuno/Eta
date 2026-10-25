@@ -14,6 +14,30 @@ import org.junit.Test
 
 class AgentInteractionLeaseTest {
     @Test(timeout = 5_000)
+    fun waitingNotificationIsBalancedAndDoesNotOwnTheMonitor() {
+        val coordinator = AgentInteractionLeaseCoordinator()
+        val first = coordinator.newLease()
+        val second = coordinator.newLease()
+        val events = java.util.Collections.synchronizedList(mutableListOf<Boolean>())
+        val started = CountDownLatch(1)
+        val worker = worker()
+        try {
+            assertTrue(first.enter({ false }))
+            first.leave()
+            val pending = worker.submit<Boolean> {
+                second.enter({ false }, onWaiting = {
+                    events.add(it)
+                    if (it) started.countDown()
+                }).also { if (it) second.leave() }
+            }
+            assertTrue(started.await(1, TimeUnit.SECONDS))
+            first.close()
+            assertTrue(pending.get(1, TimeUnit.SECONDS))
+            org.junit.Assert.assertEquals(listOf(true, false), events.toList())
+        } finally { first.close(); second.close(); worker.shutdownNow() }
+    }
+
+    @Test(timeout = 5_000)
     fun closedOwnerCannotReacquireAfterHandoff() {
         val coordinator = AgentInteractionLeaseCoordinator()
         val first = coordinator.newLease()

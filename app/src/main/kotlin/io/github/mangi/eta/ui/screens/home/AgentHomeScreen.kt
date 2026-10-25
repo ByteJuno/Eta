@@ -70,7 +70,7 @@ internal fun AgentHomeScreen(
                 val waiting = io.github.mangi.eta.agent.tool.InteractionWaitState.conversations.collectAsState().value
                 androidx.compose.foundation.layout.Column(modifier = modifier) {
                 if (conversationKey in waiting) {
-                    androidx.compose.material3.Text(
+                    top.yukonga.miuix.kmp.basic.Text(
                         text = androidx.compose.ui.res.stringResource(io.github.mangi.eta.R.string.interaction_waiting),
                     )
                 }
@@ -119,7 +119,7 @@ internal fun AgentHomeScreen(
                     onLoadEarlierMessages = { onAction(AgentHomeAction.LoadEarlierMessages) },
                     onHistoryViewportChanged = { onAction(AgentHomeAction.HistoryViewportChanged(it)) },
                     isDrawerOpen = isDrawerOpen,
-                    modifier = modifier,
+                    modifier = Modifier.weight(1f),
                 )
                 }
             }
