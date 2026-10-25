@@ -1,0 +1,7 @@
+<resources>
+<string name="browser_search_or_address">搜尋或輸入網址</string>
+<string name="browser_clear_shared_data">清除所有瀏覽器資料</string>
+<string name="browser_close_page">關閉網頁</string>
+<string name="browser_user_action_failed">瀏覽器操作未完成，請重試。</string>
+<string name="browser_clear_shared_data_message">將關閉所有頁面，清除 Cookie、快取和網站資料，包括登入狀態。</string>
+</resources>

@@ -296,6 +296,12 @@ fun AgentAppRoot(
         }
     }
 
+    fun openConversationBrowser() {
+        context.startActivity(io.github.mangi.eta.ui.screens.browser.AgentBrowserActivity.createIntent(
+            context, agentState.conversationPaneState.selectedConversationId
+                ?: io.github.mangi.eta.agent.browser.BrowserSessionRegistry.MANUAL_SESSION_KEY))
+    }
+
     @Composable
     fun RoutedShell(
         route: AppRoute,
@@ -338,7 +344,7 @@ fun AgentAppRoot(
             canStopKimiWeb = appViewModel.kimiWebState.canStop,
             onStopKimiWeb = appViewModel::stopKimiWeb,
             onRefreshKimiWeb = appViewModel::refreshKimiWeb,
-            onOpenBrowser = { pushRoute(AppRoute.Browser) },
+            onOpenBrowser = { openConversationBrowser() },
             onSelectConversation = { conversationId -> selectConversation(conversationId) },
             onConversationRename = { conversation ->
                 conversationRenameTarget = conversation
@@ -447,7 +453,7 @@ fun AgentAppRoot(
                                 AgentHomeAction.OpenPermissions -> pushRoute(AppRoute.Permissions)
                                 AgentHomeAction.OpenSystemEnhance -> pushRoute(AppRoute.SystemEnhance)
                                 AgentHomeAction.OpenSettings -> pushRoute(AppRoute.Settings)
-                                AgentHomeAction.OpenBrowser -> pushRoute(AppRoute.Browser)
+                                AgentHomeAction.OpenBrowser -> openConversationBrowser()
                                 AgentHomeAction.ExpandRunTrace -> Unit
                             }
                         },
@@ -460,7 +466,10 @@ fun AgentAppRoot(
             }
             entry<AppRoute.Browser>(swipeDismiss = swipeDismiss) {
                 RoutedShell(route = AppRoute.Browser) {
-                    AgentBrowserScreen()
+                    AgentBrowserScreen(session = remember {
+                        io.github.mangi.eta.agent.browser.BrowserSessionRegistry.get(
+                            io.github.mangi.eta.agent.browser.BrowserSessionRegistry.MANUAL_SESSION_KEY)
+                    }, onBack = { popRoute() })
                 }
             }
             entry<AppRoute.Terminal>(swipeDismiss = swipeDismiss) {
@@ -479,7 +488,7 @@ fun AgentAppRoot(
                     onAction = { action ->
                         when (action) {
                             AgentToolsAction.NavigateBack -> popRoute()
-                            AgentToolsAction.OpenBrowser -> pushRoute(AppRoute.Browser)
+                            AgentToolsAction.OpenBrowser -> openConversationBrowser()
                             AgentToolsAction.OpenWebToolsSettings -> pushRoute(AppRoute.WebToolsSettings)
                             AgentToolsAction.OpenEnhancements -> pushRoute(AppRoute.SystemEnhance)
                             AgentToolsAction.OpenPermissions -> pushRoute(AppRoute.Permissions)

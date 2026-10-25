@@ -22,7 +22,12 @@ internal class AgentInteractionLeaseCoordinator {
         val isOwner: Boolean get() = synchronized(monitor) { owner === this }
 
         /** Callbacks must not block; they are evaluated outside the coordinator lock. */
-        fun enter(isCancelled: () -> Boolean, isPaused: () -> Boolean = { false }): Boolean {
+        fun enter(
+            isCancelled: () -> Boolean,
+            isPaused: () -> Boolean = { false },
+            onWaiting: (Boolean) -> Unit = {},
+        ): Boolean {
+            var announcedWaiting = false
             try {
                 while (true) {
                     if (isCancelled() || Thread.currentThread().isInterrupted) return false
@@ -40,6 +45,13 @@ internal class AgentInteractionLeaseCoordinator {
                             waiters.remove(this)
                             return true
                         }
+                    }
+                    // Notify outside the monitor: UI observers must never delay lease release.
+                    if (!announcedWaiting) {
+                        announcedWaiting = true
+                        onWaiting(true)
+                    }
+                    synchronized(monitor) {
                         try {
                             monitor.wait(WAIT_CHECK_MS)
                         } catch (_: InterruptedException) {
@@ -49,6 +61,7 @@ internal class AgentInteractionLeaseCoordinator {
                     }
                 }
             } finally {
+                if (announcedWaiting) onWaiting(false)
                 synchronized(monitor) {
                     if (waiters.remove(this)) monitor.notifyAll()
                 }

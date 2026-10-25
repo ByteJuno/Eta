@@ -1,0 +1,3 @@
+<resources>
+    <string name="interaction_waiting">Waiting for screen/browser control; another conversation is using it.</string>
+</resources>

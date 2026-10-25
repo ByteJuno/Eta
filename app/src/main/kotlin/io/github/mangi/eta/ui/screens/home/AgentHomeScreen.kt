@@ -1,11 +1,13 @@
 package io.github.mangi.eta.ui.screens.home
 
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.key
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import io.github.mangi.eta.data.datastore.SettingsDataStore
 import io.github.mangi.eta.ui.components.AgentChatBody
@@ -13,6 +15,8 @@ import io.github.mangi.eta.ui.components.DisplayRouteChoice
 import io.github.mangi.eta.ui.components.LocalDisplayRouteChoice
 import io.github.mangi.eta.ui.components.AgentConversationLoadState
 import io.github.mangi.eta.ui.components.LocalRoleplayChat
+import io.github.mangi.eta.ui.components.LocalAgentBrowserSession
+import io.github.mangi.eta.agent.browser.BrowserSessionRegistry
 import io.github.mangi.eta.ui.components.chatConversationCompositionKey
 import io.github.mangi.eta.ui.model.AgentChatHomeUiState
 import io.github.mangi.eta.ui.model.ConversationHistoryLoadState
@@ -54,10 +58,22 @@ internal fun AgentHomeScreen(
                 modifier = modifier,
             )
         } else {
+            val browser = remember(conversationKey) {
+                BrowserSessionRegistry.get(conversationKey ?: BrowserSessionRegistry.MANUAL_SESSION_KEY)
+            }
             CompositionLocalProvider(
                 LocalRoleplayChat provides state.roleplayChatUi(),
                 LocalDisplayRouteChoice provides displayChoice,
+                LocalAgentBrowserSession provides browser,
+
             ) {
+                val waiting = io.github.mangi.eta.agent.tool.InteractionWaitState.conversations.collectAsState().value
+                androidx.compose.foundation.layout.Column(modifier = modifier) {
+                if (conversationKey in waiting) {
+                    androidx.compose.material3.Text(
+                        text = androidx.compose.ui.res.stringResource(io.github.mangi.eta.R.string.interaction_waiting),
+                    )
+                }
                 AgentChatBody(
                     messages = state.messages,
                     modelPickerState = modelPickerState,
@@ -105,6 +121,7 @@ internal fun AgentHomeScreen(
                     isDrawerOpen = isDrawerOpen,
                     modifier = modifier,
                 )
+                }
             }
         }
     }

@@ -64,6 +64,9 @@
         android:localeConfig="@xml/locales_config"
         android:networkSecurityConfig="@xml/network_security_config"
         android:roundIcon="@mipmap/ic_launcher_round">
+        <activity android:name=".ui.screens.browser.AgentBrowserActivity"
+            android:exported="false" android:hardwareAccelerated="true" />
+
 
         <activity
             android:name=".ui.MainActivity"

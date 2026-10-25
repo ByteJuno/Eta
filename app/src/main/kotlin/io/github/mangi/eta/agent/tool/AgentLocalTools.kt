@@ -15,7 +15,6 @@ import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.SystemClock
-import io.github.mangi.eta.agent.browser.AgentBrowserSession
 import io.github.mangi.eta.agent.device.DeviceControlUnavailableException
 import io.github.mangi.eta.agent.device.RootAccess
 import io.github.mangi.eta.agent.device.RootShellDeviceController
@@ -126,6 +125,9 @@ internal class AgentLocalTools(
 ) : AgentModelClient.ToolExecutor, AutoCloseable {
 
     private val closed = AtomicBoolean(false)
+    private val browserSession by lazy { io.github.mangi.eta.agent.browser.BrowserSessionRegistry.get(virtualScreenOwner) }
+    private val browserRunBinding by lazy { io.github.mangi.eta.agent.browser.BrowserSessionRegistry.acquireRun(virtualScreenOwner, browserRunId) }
+    private val browserUsed = AtomicBoolean(false)
     private val interactionLease = AgentInteractionLeaseCoordinator.shared.newLease()
     private val interactionAnnounced = AtomicBoolean(false)
     private val primaryDisplayPrepared = AtomicBoolean(false)
@@ -200,7 +202,10 @@ internal class AgentLocalTools(
                 completed = retainVirtualScreen.get() && !pausedVirtualScreen.get())
             publishedObservation.set(PublishedObservation())
             virtualUiTools.invalidateObservation()
-            if (interactionLease.isOwner) AgentBrowserSession.interruptAgentAction(browserRunId)
+            if (browserUsed.get()) {
+                browserSession.interruptAgentAction(browserRunId)
+                browserRunBinding.close()
+            }
             webTools.close()
             terminalController.interruptAll()
             rootCommandExecutor.close()
@@ -208,6 +213,7 @@ internal class AgentLocalTools(
             inspectedGitHubSnapshots.clear()
         } finally {
             interactionLease.close()
+            InteractionWaitState.update(browserRunId, virtualScreenOwner, false)
         }
     }
 
@@ -315,7 +321,9 @@ internal class AgentLocalTools(
         }
 
     private inline fun withInteractionLease(action: () -> AgentModelClient.ToolResult): AgentModelClient.ToolResult {
-        if (!interactionLease.enter({ closed.get() || isRunCancelled() || hasPendingSteering() }, isRunPaused)) {
+        if (!interactionLease.enter({ closed.get() || isRunCancelled() || hasPendingSteering() }, isRunPaused, { waiting ->
+                InteractionWaitState.update(browserRunId, virtualScreenOwner, waiting)
+            })) {
             return textResult(errorResult(
                 if (hasPendingSteering() && !closed.get() && !isRunCancelled()) "TOOL_SUPERSEDED" else "DISPLAY_CANCELLED",
                 "等待共享界面资源时任务已停止或收到补充指令，本次工具未执行",
@@ -606,11 +614,14 @@ internal class AgentLocalTools(
         if (!browserToolsEnabled()) {
             return textResult(errorResult("BROWSER_TOOLS_DISABLED", "请先启用网页浏览工具"))
         }
-        val result = AgentBrowserSession.execute(
+        browserRunBinding
+        browserUsed.set(true)
+        val result = browserSession.execute(
             context = context,
             args = args,
             runId = browserRunId,
             toolCallId = toolCallId,
+            checkCancellation = { if (closed.get() || isRunCancelled()) throw io.github.mangi.eta.agent.runtime.AgentRunCancelledException() },
         )
         return AgentModelClient.ToolResult(
             content = result.content,

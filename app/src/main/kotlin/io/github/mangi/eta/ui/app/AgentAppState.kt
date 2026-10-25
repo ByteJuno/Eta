@@ -1022,6 +1022,7 @@ internal class AgentAppState(
 
     fun deleteConversation(conversationId: String) {
         activeRuns.runIdForConversation(conversationId)?.let(::stopRun)
+        io.github.mangi.eta.agent.browser.BrowserSessionRegistry.requestRemove(conversationId)
         val wasSelected = selectedConversationId == conversationId
         ConversationDisplayRoute.set(appContext, conversationId, false)
         conversationsById = conversationsById - conversationId

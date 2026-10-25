@@ -1,0 +1,3 @@
+<resources>
+    <string name="interaction_waiting">正在等待螢幕/瀏覽器控制權，其他會話正在使用。</string>
+</resources>

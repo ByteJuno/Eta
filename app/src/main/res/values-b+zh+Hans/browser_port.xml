@@ -1,0 +1,7 @@
+<resources>
+<string name="browser_search_or_address">搜索或输入网址</string>
+<string name="browser_clear_shared_data">清除全部浏览器数据</string>
+<string name="browser_close_page">关闭网页</string>
+<string name="browser_user_action_failed">浏览器操作未完成，请重试。</string>
+<string name="browser_clear_shared_data_message">将关闭全部页面，清除 Cookie、缓存和网站数据，包括登录状态。</string>
+</resources>
