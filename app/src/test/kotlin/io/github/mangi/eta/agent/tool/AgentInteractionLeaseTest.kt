@@ -14,6 +14,31 @@ import org.junit.Test
 
 class AgentInteractionLeaseTest {
     @Test(timeout = 5_000)
+    fun closedOwnerCannotReacquireAfterHandoff() {
+        val coordinator = AgentInteractionLeaseCoordinator()
+        val first = coordinator.newLease()
+        val second = coordinator.newLease()
+        val worker = worker()
+        try {
+            assertTrue(first.enter({ false }))
+            first.leave()
+            val pending = worker.submit<Boolean> {
+                second.enter({ false }).also { if (it) second.leave() }
+            }
+            assertPending(pending)
+            // Closing transfers ownership; the old executor must never reacquire it.
+            assertTrue(first.isOwner)
+            first.close()
+            assertTrue(pending.get(1, TimeUnit.SECONDS))
+            assertFalse(first.enter({ false }))
+        } finally {
+            first.close()
+            second.close()
+            worker.shutdownNow()
+        }
+    }
+
+    @Test(timeout = 5_000)
     fun ownershipSurvivesToolBoundariesUntilExecutorCloses() {
         val coordinator = AgentInteractionLeaseCoordinator()
         val first = coordinator.newLease()

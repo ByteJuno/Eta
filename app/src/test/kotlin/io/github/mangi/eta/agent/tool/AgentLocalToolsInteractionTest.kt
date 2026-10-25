@@ -23,6 +23,32 @@ import org.robolectric.annotation.Config
 @Config(sdk = [36])
 class AgentLocalToolsInteractionTest {
     @Test(timeout = 10_000)
+    fun cancellationDuringAcquisitionCallbackNeverReachesToolBoundary() {
+        val stopped = AtomicBoolean()
+        val reached = AtomicBoolean()
+        val executor = tools(isCancelled = stopped::get,
+            onAcquired = { stopped.set(true) },
+            beforeTool = { reached.set(true); reject() })
+        try {
+            assertEquals("DISPLAY_CANCELLED", code(executor, "observe_screen"))
+            assertFalse(reached.get())
+        } finally { executor.close() }
+    }
+
+    @Test(timeout = 10_000)
+    fun acquisitionIsAnnouncedOnceAndNeverForNonUiTools() {
+        val count = java.util.concurrent.atomic.AtomicInteger()
+        val executor = tools(onAcquired = { count.incrementAndGet() })
+        try {
+            assertEquals("TEST_BOUNDARY", code(executor, "search_apps"))
+            assertEquals(0, count.get())
+            assertEquals("TEST_BOUNDARY", code(executor, "observe_screen"))
+            assertEquals("TEST_BOUNDARY", code(executor, "observe_screen"))
+            assertEquals(1, count.get())
+        } finally { executor.close() }
+    }
+
+    @Test(timeout = 10_000)
     fun waitingConversationCanUseNonUiToolsAndCancelWithoutAffectingOwner() {
         val waiting = CountDownLatch(1)
         val stopped = AtomicBoolean()
@@ -79,6 +105,7 @@ class AgentLocalToolsInteractionTest {
 
     private fun tools(
         isCancelled: () -> Boolean = { false },
+        onAcquired: () -> Unit = {},
         beforeTool: (String) -> ToolExecutionDecision = { reject() },
     ) = AgentLocalTools(
         context = RuntimeEnvironment.getApplication() as Context,
@@ -92,6 +119,7 @@ class AgentLocalToolsInteractionTest {
         virtualScreenSettings = { Settings(virtualScreenEnabled = false) },
         beforeToolExecution = beforeTool,
         isRunCancelled = isCancelled,
+        onInteractionAcquired = onAcquired,
     )
 
     private fun code(tools: AgentLocalTools, name: String): String = JSONObject(

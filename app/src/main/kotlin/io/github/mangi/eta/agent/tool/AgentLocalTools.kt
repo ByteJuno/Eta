@@ -322,7 +322,24 @@ internal class AgentLocalTools(
             ))
         }
         return try {
-            if (interactionAnnounced.compareAndSet(false, true)) onInteractionAcquired()
+            // A cancelled/steered waiter may win the lease concurrently with cancellation.
+            // Do not prepare a display or call the host before rechecking admission.
+            if (closed.get() || isRunCancelled() || hasPendingSteering()) {
+                return textResult(errorResult(
+                    if (hasPendingSteering() && !closed.get() && !isRunCancelled()) "TOOL_SUPERSEDED" else "DISPLAY_CANCELLED",
+                    "取得共享界面资源时任务已失效，本次工具未执行",
+                ))
+            }
+            if (interactionAnnounced.compareAndSet(false, true)) {
+                publishedObservation.set(PublishedObservation())
+                primaryObserved.set(false)
+                virtualUiTools.invalidateObservation()
+                onInteractionAcquired()
+            }
+            // Host callbacks can synchronously cancel the run as ownership changes.
+            if (closed.get() || isRunCancelled()) {
+                return textResult(errorResult("DISPLAY_CANCELLED", "任务已停止，本次工具未执行"))
+            }
             // Do not close another run's display merely by constructing a text-only executor.
             if (primaryDisplay && primaryDisplayPrepared.compareAndSet(false, true)) {
                 VirtualScreenSession.closeOwner(virtualScreenOwner)
