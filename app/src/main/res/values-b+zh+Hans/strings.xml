@@ -411,7 +411,7 @@
   <string name="ui_environmental_status_5b32a1">环境状态</string>
   <string name="ui_user_skills_748e7f">用户安装</string>
   <string name="ui_long_press_the_power_button_1958d0">电源键长按</string>
-  <string name="ui_leave_blank_to_use_the_default_mobile_agent_prompt_w_21e7c8">留空使用默认手机 Agent 提示词</string>
+  <string name="ui_leave_blank_to_use_the_default_mobile_agent_prompt_w_21e7c8">你可以在这里告诉 AI 如何与你交流、需要遵循哪些要求，也可以留空。使用角色卡时，会改用角色卡的提示词。</string>
   <string name="ui_knew_cb63c6">知道了</string>
   <string name="ui_remove_image_089db3">移除图片</string>
   <string name="ui_remove_file_reference_04bbfc">移除文件引用</string>

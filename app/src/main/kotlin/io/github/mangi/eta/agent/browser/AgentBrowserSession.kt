@@ -694,6 +694,7 @@ internal object AgentBrowserSession {
     }
 
     private fun attachWebViewOnMain(view: WebView, container: ViewGroup) {
+        view.setLayerType(View.LAYER_TYPE_NONE, null)
         (view.parent as? ViewGroup)?.takeIf { it !== container }?.removeView(view)
         if (view.parent == null) {
             container.removeAllViews()
@@ -825,7 +826,7 @@ internal object AgentBrowserSession {
             ) else 1f
             val width = (sourceWidth * scale).roundToInt().coerceAtLeast(1)
             val height = (sourceHeight * scale).roundToInt().coerceAtLeast(1)
-            if (view.windowToken == null) view.setLayerType(View.LAYER_TYPE_SOFTWARE, null)
+            // Bitmap Canvas controls software capture; do not persist a software layer on the shared view.
             val captured = createBitmap(width, height)
             try {
                 Canvas(captured).also { canvas ->
@@ -1068,7 +1069,7 @@ internal object AgentBrowserSession {
 
         override fun onProgressChanged(view: WebView, newProgress: Int) {
             currentProgress = newProgress.coerceIn(0, 100)
-            currentLoading = newProgress < 100
+            // Loading belongs to the main-page lifecycle, not late progress callbacks.
             publishSnapshotOnMain()
         }
     }

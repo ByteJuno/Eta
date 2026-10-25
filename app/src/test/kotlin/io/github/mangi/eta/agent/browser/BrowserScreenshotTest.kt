@@ -41,6 +41,7 @@ class BrowserScreenshotTest {
         ).apply { isAccessible = true }
         try {
             val image = capture.invoke(AgentBrowserSession, view, false) as BrowserImage
+            assertEquals(android.view.View.LAYER_TYPE_NONE, view.layerType)
             assertEquals("image/png", image.mimeType)
             assertEquals(1_700, image.width)
             assertEquals(2_600, image.height)

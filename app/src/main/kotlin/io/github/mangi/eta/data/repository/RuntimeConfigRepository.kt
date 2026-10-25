@@ -118,11 +118,11 @@ internal object RuntimeConfigRepository {
         model: Model,
         defaultAssistantSystemPrompt: String = "",
     ): AgentModelClient.ModelConfig {
-        val systemPrompt = provider.systemPrompt
-            ?.trim()
-            ?.takeIf { it.isNotBlank() && it != BuiltinProviders.DEFAULT_SYSTEM_PROMPT }
-            ?: defaultAssistantSystemPrompt.trim().takeIf { it.isNotBlank() }
-            ?: BuiltinProviders.DEFAULT_SYSTEM_PROMPT
+        // Explicit empty means no prompt; null/legacy built-in follows the fork's editable default.
+        val systemPrompt = when (val prompt = provider.systemPrompt?.trim()) {
+            null, BuiltinProviders.DEFAULT_SYSTEM_PROMPT -> defaultAssistantSystemPrompt.trim()
+            else -> prompt
+        }
         val sourceType = ProviderSourceRegistry.resolve(provider)
         val profile = ProviderConnectionProfile.forAuthMode(provider.authMode)
         val endpointMode = profile?.endpointMode ?: provider.endpointMode()

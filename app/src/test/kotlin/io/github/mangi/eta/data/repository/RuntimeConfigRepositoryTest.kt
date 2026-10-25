@@ -20,17 +20,20 @@ import org.junit.Test
 
 class RuntimeConfigRepositoryTest {
     @Test
-    fun editedDefaultAppliesToBuiltinAndEmptyPromptsButPreservesProviderOverride() {
-        val provider = OpenAiCompatibleProviderSetting(id = "p1", name = "Provider", baseUrl = "https://example.invalid")
-        val model = Model(id = "m1", modelId = "fixture", displayName = "Fixture")
-        for (prompt in listOf(null, " ", BuiltinProviders.DEFAULT_SYSTEM_PROMPT)) {
-            assertEquals("edited-default", RuntimeConfigRepository.buildRuntimeConfig(
-                provider.copy(systemPrompt = prompt), model, "  edited-default  ").systemPrompt)
+    fun editableDefaultAndExplicitEmptyRemainDistinct() {
+        val provider = OpenAiCompatibleProviderSetting(id = "p", name = "Fixture", baseUrl = "https://example.invalid")
+        val model = Model(id = "m", modelId = "fixture", displayName = "Fixture")
+        for (prompt in listOf(null, BuiltinProviders.DEFAULT_SYSTEM_PROMPT)) {
+            assertEquals("edited", RuntimeConfigRepository.buildRuntimeConfig(
+                provider.copy(systemPrompt = prompt), model, " edited ").systemPrompt)
         }
-        assertEquals("provider-override", RuntimeConfigRepository.buildRuntimeConfig(
-            provider.copy(systemPrompt = "provider-override"), model, "edited-default").systemPrompt)
-        assertEquals(BuiltinProviders.DEFAULT_SYSTEM_PROMPT, RuntimeConfigRepository.buildRuntimeConfig(
-            provider, model, " ").systemPrompt)
+        for (prompt in listOf("", "  ", "custom")) {
+            val config = RuntimeConfigRepository.buildRuntimeConfig(provider.copy(systemPrompt = prompt), model, "edited")
+            val restored = Json.decodeFromString<AgentModelClient.ModelConfig>(RuntimeConfigRepository.runtimeConfigJson(config))
+            assertEquals(prompt.trim(), restored.systemPrompt)
+        }
+        assertEquals("", RuntimeConfigRepository.buildRuntimeConfig(provider.copy(systemPrompt = null), model, " ").systemPrompt)
+
     }
 
     @Test

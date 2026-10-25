@@ -421,7 +421,7 @@
   <string name="ui_environmental_status_5b32a1">Environment status</string>
   <string name="ui_user_skills_748e7f">Installed by you</string>
   <string name="ui_long_press_the_power_button_1958d0">Long press the power button</string>
-  <string name="ui_leave_blank_to_use_the_default_mobile_agent_prompt_w_21e7c8">Leave blank to use the default mobile Agent system prompt</string>
+  <string name="ui_leave_blank_to_use_the_default_mobile_agent_prompt_w_21e7c8">Tell the AI how you\'d like it to communicate and what instructions to follow, or leave this blank. When using a character card, its prompt is used instead.</string>
   <string name="ui_knew_cb63c6">Got it</string>
   <string name="ui_remove_image_089db3">Remove image</string>
   <string name="ui_remove_file_reference_04bbfc">Remove file reference</string>
