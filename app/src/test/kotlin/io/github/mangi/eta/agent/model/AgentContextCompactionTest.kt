@@ -10,6 +10,41 @@ import org.junit.Test
 
 class AgentContextCompactionTest {
     @Test
+    fun failedAutomaticSummaryIsNotRepeatedWithinRunButManualRetryIsAllowed() {
+        var requests = 0
+        val original = jsonHistory()
+        val before = original.toString()
+        val session = AgentContextSession(config, original, 1, "operation", provider { _, _ ->
+            requests++
+            response("", "stop")
+        }, AgentRunController(), { emptySet() }, {}, { fail("Invalid summary must not commit") })
+        session.observeInputTokens(120_000)
+        session.compact(final = true)
+        session.compact(final = true)
+        assertEquals(1, requests)
+        assertEquals(before, original.toString())
+        assertThrows(AgentModelFailure::class.java) { session.compact(force = true) }
+        assertEquals(2, requests)
+    }
+
+    @Test
+    fun summaryReasoningUsesOnlyDeclaredCapabilities() {
+        val max = io.github.mangi.eta.data.model.ReasoningEffort.MAX
+        val high = io.github.mangi.eta.data.model.ReasoningEffort.HIGH
+        val off = io.github.mangi.eta.data.model.ReasoningEffort.OFF
+        val original = config.copy(reasoningEffort = max, thinkingEnabled = true)
+        assertEquals(original, AgentContextSummarizer.summaryConfig(original))
+        val mandatory = original.copy(reasoningCapabilities = io.github.mangi.eta.data.model.ModelReasoningCapabilities(
+            supportedEfforts = listOf(max, high), mandatory = true, canDisable = false))
+        assertEquals(high, AgentContextSummarizer.summaryConfig(mandatory).reasoningEffort)
+        assertEquals(max, mandatory.reasoningEffort)
+        val optional = mandatory.copy(reasoningCapabilities = mandatory.reasoningCapabilities!!.copy(
+            mandatory = false, canDisable = true))
+        assertEquals(off, AgentContextSummarizer.summaryConfig(optional).reasoningEffort)
+        assertFalse(AgentContextSummarizer.summaryConfig(optional).thinkingEnabled)
+    }
+
+    @Test
     fun automaticScreenContentIsNotCopiedIntoCompactionInput() {
         val messages = jsonHistory()
         val user = AgentConversationCodec.userTextMessage("保留最新问题")

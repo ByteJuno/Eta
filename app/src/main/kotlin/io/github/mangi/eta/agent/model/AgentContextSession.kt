@@ -21,6 +21,7 @@ internal class AgentContextSession(
     private val contextWindow = config.knownContextWindow
     private var inputTokens: Int? = null
     private var compacted = false
+    private var automaticCompactionFailed = false
     private var consumedSupplementCount = 0
     private var consumedUserTurns = (systemCount until messages.length()).sumOf {
         val message = messages.getJSONObject(it)
@@ -61,6 +62,8 @@ internal class AgentContextSession(
 
     fun compact(force: Boolean = false, final: Boolean = false) {
         val before = inputTokens
+        // A failed automatic summary is not replayed again within this run. Manual requests remain explicit.
+        if (!force && automaticCompactionFailed) return
         if (AnthropicEphemeralState.hasPendingToolResponse(messages)) {
             if (force) {
                 throw AgentContextCompactor.signedAnthropicToolRoundFailure()
@@ -103,6 +106,7 @@ internal class AgentContextSession(
             onEvent(AgentEvent.ContextCompaction(operation, AgentEvent.ContextCompaction.PHASE_COMPLETED, before))
         } catch (failure: Exception) {
             runController.throwIfCancelled()
+            automaticCompactionFailed = true
             onEvent(AgentEvent.ContextCompaction(operation, "failed", before,
                 reasonCode = (failure as? AgentModelFailure)?.code ?: "CONTEXT_SUMMARY_FAILED"))
             if (!final) throw failure

@@ -1,6 +1,7 @@
 package io.github.mangi.eta.agent.model
 
 import io.github.mangi.eta.agent.runtime.AgentRunController
+import io.github.mangi.eta.data.model.ReasoningEffort
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -27,33 +28,48 @@ internal class AgentContextSummarizer(
         var startedAt = System.nanoTime()
         var usage: io.github.mangi.eta.agent.runtime.AgentTokenUsage? = null
         val response = provider.complete(
-            ProviderRequest(config, messages, JSONArray(), purpose = ProviderRequestPurpose.COMPACTION),
+            ProviderRequest(summaryConfig(config), messages, JSONArray(), purpose = ProviderRequestPurpose.COMPACTION),
             controller,
         ) { event ->
             if (event == ProviderEvent.RequestStarted) startedAt = System.nanoTime()
             if (event is ProviderEvent.Usage) usage = (usage ?: io.github.mangi.eta.agent.runtime.AgentTokenUsage()).merge(event.usage)
             if (event is ProviderEvent.HostedToolStarted ||
                 event is ProviderEvent.BlockStart && event.kind == AssistantBlockKind.TOOL_CALL) {
-                throw invalidSummary()
+                throw invalidSummary("TOOL_CALL")
             }
         }
         controller.throwIfCancelled()
         val summary = response.assistantMessage.optString("content").trim()
-        if (response.stopReason != AssistantStopReason.END_TURN ||
-            AgentConversationCodec.parseToolCalls(response.assistantMessage).isNotEmpty() ||
-            summary.isBlank() || summary == "null" || summary.length > MAX_SUMMARY_CHARS) {
-            throw invalidSummary()
+        val invalid = when {
+            AgentConversationCodec.parseToolCalls(response.assistantMessage).isNotEmpty() -> "TOOL_CALL"
+            response.stopReason == AssistantStopReason.OUTPUT_LIMIT -> "OUTPUT_LIMIT"
+            response.stopReason != AssistantStopReason.END_TURN -> "STOP_REASON"
+            summary.isBlank() || summary == "null" -> "EMPTY"
+            summary.length > MAX_SUMMARY_CHARS -> "TOO_LONG"
+            else -> null
         }
+        if (invalid != null) throw invalidSummary(invalid)
         usage?.let { onUsage(it.copy(contextTokens = null,
             requestDurationMs = ((System.nanoTime() - startedAt) / 1_000_000).coerceAtLeast(1))) }
         return summary
     }
 
-    private fun invalidSummary() = AgentModelFailure(
-        "CONTEXT_SUMMARY_INVALID", false, "模型未返回完整且有界的摘要，原始上下文已保留。",
+    private fun invalidSummary(reason: String) = AgentModelFailure(
+        "CONTEXT_SUMMARY_$reason", false,
+        "上下文摘要校验失败（$reason），原始上下文已保留。",
     )
 
-    private companion object {
-        const val MAX_SUMMARY_CHARS = 12_000
+    companion object {
+        private const val MAX_SUMMARY_CHARS = 12_000
+
+        internal fun summaryConfig(config: AgentModelClient.ModelConfig): AgentModelClient.ModelConfig {
+            val capabilities = config.reasoningCapabilities ?: return config
+            val effort = if (capabilities.canDisable && !capabilities.mandatory) ReasoningEffort.OFF
+                else capabilities.supportedEfforts.filter {
+                    it != ReasoningEffort.OFF && it != ReasoningEffort.DEFAULT
+                }.minByOrNull { it.rank } ?: return config
+            // Do not invent unsupported OFF/LOW parameters for custom or mandatory reasoning models.
+            return config.copy(reasoningEffort = effort, thinkingEnabled = effort.enablesReasoning)
+        }
     }
 }

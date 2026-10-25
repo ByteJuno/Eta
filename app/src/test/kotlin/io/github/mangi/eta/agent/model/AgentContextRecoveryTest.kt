@@ -133,7 +133,11 @@ class AgentContextRecoveryTest {
                 response(content, stop)
             }, AgentRunController(), { emptySet() }, {}, { fail("不应提交无效摘要") })
             val failure = assertThrows(AgentModelFailure::class.java) { session.compact(force = true) }
-            assertEquals("CONTEXT_SUMMARY_INVALID", failure.code)
+            assertEquals(when {
+                stop == "length" -> "CONTEXT_SUMMARY_OUTPUT_LIMIT"
+                content.isEmpty() -> "CONTEXT_SUMMARY_EMPTY"
+                else -> "CONTEXT_SUMMARY_TOO_LONG"
+            }, failure.code)
             assertEquals(1, requests)
             assertEquals(original, messages.toString())
         }

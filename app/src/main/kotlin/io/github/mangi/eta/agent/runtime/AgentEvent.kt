@@ -21,7 +21,8 @@ internal sealed interface AgentEvent {
         val displayMessage: String get() = when (phase) {
             PHASE_STARTED -> RUNNING_DETAIL
             PHASE_COMPLETED -> "上下文已压缩，用量将在下一次模型响应后更新。"
-            else -> "上下文压缩失败，原始上下文已保留。"
+            else -> "上下文压缩失败，原始上下文已保留。" +
+                reasonCode.takeIf { it.matches(Regex("[A-Z0-9_]+")) }?.let { "（$it）" }.orEmpty()
         }
         override fun toLogLine(): String =
             "context_compaction phase=${phase.toSafeLogToken()}, before=$tokensBefore, after=$tokensAfter, code=${reasonCode.toSafeLogToken()}"
