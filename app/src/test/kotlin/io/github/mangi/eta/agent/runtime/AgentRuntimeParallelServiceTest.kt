@@ -132,7 +132,7 @@ class AgentRuntimeParallelServiceTest {
             val original = service.registerTestPending(request, receiver(first))
             val retryReceiver = receiver(second)
             repeat(2) {
-                service.callRuntime("ingestRunRequest", AgentRuntimeWire.IncomingRunRequest(request, emptyList()), retryReceiver)
+                service.callRuntime("ingestRunRequest", AgentRuntimeWire.IncomingRunRequest(request, emptyList()), retryReceiver, true)
             }
             assertSame(original, service.testRegistry().pending("preparing"))
             service.callRuntime("cancelRun", "preparing")
@@ -164,7 +164,7 @@ class AgentRuntimeParallelServiceTest {
             })
             service.callRuntime("ingestRunRequest", AgentRuntimeWire.IncomingRunRequest(
                 runtimeTestRequest(session.runId), emptyList(),
-            ), receiver)
+            ), receiver, true)
             (service.readRuntimeField("resultIo") as java.util.concurrent.ExecutorService)
                 .submit {}.get(2, java.util.concurrent.TimeUnit.SECONDS)
             shadowOf(Looper.getMainLooper()).idle()
@@ -206,7 +206,7 @@ class AgentRuntimeParallelServiceTest {
             service.registerTestRun(previous, conversationId = "conversation")
             previous.complete(AgentRuntimeWire.RunResult("previous", true, "done"))
             val next = runtimeTestRequest("next", "conversation")
-            service.callRuntime("ingestRunRequest", AgentRuntimeWire.IncomingRunRequest(next, emptyList()), null)
+            service.callRuntime("ingestRunRequest", AgentRuntimeWire.IncomingRunRequest(next, emptyList()), null, true)
             assertNotNull(service.testRegistry().pending("next"))
             assertNotNull(service.testRegistry().active("previous"))
             service.callRuntime("cancelRun", "next")
