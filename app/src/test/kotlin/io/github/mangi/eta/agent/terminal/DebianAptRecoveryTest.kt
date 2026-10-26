@@ -19,6 +19,7 @@ class DebianAptRecoveryTest {
         val fixture = fixture()
         fixture.install().assertSuccess()
         assertFalse(fixture.calls.any { it.contains("--configure") || it.contains("--fix-broken") })
+        assertTrue(fixture.calls.any { it.contains("install -y --no-remove --no-install-recommends") })
     }
 
     @Test

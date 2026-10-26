@@ -394,7 +394,7 @@ internal class DebianEnvironmentInstaller(
                   eta_apt --error-on=any update || continue
                   [ "${'$'}eta_action" != update ] || exit 0
                   eta_apt_repair || exit $APT_REPAIR_FAILED_EXIT_CODE
-                  if eta_apt install -y --no-install-recommends "${'$'}@"; then
+                  if eta_apt install -y --no-remove --no-install-recommends "${'$'}@"; then
                     eta_apt_healthy || exit $APT_REPAIR_FAILED_EXIT_CODE
                     exit 0
                   fi
