@@ -47,6 +47,7 @@ internal class AgentRuntimeSession(
     }
     private var state = State.RUNNING
     private val replayEvents = mutableListOf<AgentEvent>()
+    private val searchSuggestionsBudget = SearchSuggestionsBudget()
     private val subscribers = mutableListOf<Subscriber>()
 
     private data class Subscriber(
@@ -69,6 +70,8 @@ internal class AgentRuntimeSession(
     fun emit(event: AgentEvent): Boolean =
         lock.withLock {
             if (state != State.RUNNING) return false
+            if (event is AgentEvent.SearchSuggestions &&
+                !searchSuggestionsBudget.accept(event.round, event.index, event.html)) return false
             recordForReplay(event)
             subscribers.forEach { it.eventSink(event) }
             true
@@ -117,7 +120,7 @@ internal class AgentRuntimeSession(
     }
 
     private fun recordForReplay(event: AgentEvent) {
-        val projected = event.recoveryProjection() ?: return
+        val projected = event.replayProjection() ?: return
         if (projected !is AgentEvent.AssistantBlockDelta) {
             replayEvents += projected
             return
@@ -158,6 +161,7 @@ internal class AgentRuntimeSession(
             subscribers.forEach { it.resultSink(result) }
             subscribers.clear()
             replayEvents.clear()
+            searchSuggestionsBudget.clear()
         }
         commitFailure?.let { throw it }
         return true
@@ -182,6 +186,7 @@ internal class AgentRuntimeSession(
             subscribers.forEach { it.resultSink(result) }
             subscribers.clear()
             replayEvents.clear()
+            searchSuggestionsBudget.clear()
         }
         return true
     }

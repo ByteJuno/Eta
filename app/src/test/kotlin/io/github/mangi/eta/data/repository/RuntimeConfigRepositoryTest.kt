@@ -33,7 +33,6 @@ class RuntimeConfigRepositoryTest {
             assertEquals(prompt.trim(), restored.systemPrompt)
         }
         assertEquals("", RuntimeConfigRepository.buildRuntimeConfig(provider.copy(systemPrompt = null), model, " ").systemPrompt)
-
     }
 
     @Test

@@ -1,12 +1,16 @@
-# Eta
+<h1 align="center">Eta</h1>
 
 > **关于这个 fork**：在上游 [Mangi-11/Eta](https://github.com/Mangi-11/Eta) 的基础上，合并了 [lejw0925](https://github.com/lejw0925/Eta/tree/feat/virtual-screen-automation-vivo)（原上游 PR #142）的独立虚拟屏、自动任务、经验学习与审批通知中心、实时插话、tok/s 统计，并去掉了其中仅适用于 vivo 的蓝心小 V 接管、原子岛和原子笔记部分。仅供个人使用，不发布安装包；许可证与上游相同（PolyForm Noncommercial 1.0.0），未经原作者书面授权请勿二次分发。
 
-**简体中文** | [English](README_EN.md)
+<p align="center"><strong>简体中文</strong> | <a href="README_EN.md">English</a></p>
 
- <p><a href="https://github.com/Mangi-11/Eta/releases"><img src="https://img.shields.io/github/downloads/Mangi-11/Eta/total?logo=github&amp;label=Downloads&amp;color=1677FF" alt="GitHub Releases 累计下载量"></a> <img src="https://img.shields.io/badge/minSdk-33-3DDC84?logo=android&amp;logoColor=white" alt="minSdk 33"> <img src="https://img.shields.io/badge/Kotlin-2.4.20-7F52FF?logo=kotlin&amp;logoColor=white" alt="Kotlin 2.4.20"> <img src="https://img.shields.io/badge/AGP-9.4.1-3DDC84?logo=android&amp;logoColor=white" alt="AGP 9.4.1"> <img src="https://img.shields.io/badge/Assistant%20Integrations-ColorOS%20%26%20HyperOS-1677FF" alt="Assistant integrations for ColorOS and HyperOS"></p>
+<p align="center"><strong>面向 Android 的第三方系统级 AI 助手</strong></p>
 
-**面向 Android 的第三方系统级 AI 助手**
+<p align="center"><a href="https://github.com/Mangi-11/Eta/stargazers"><img src="https://img.shields.io/github/stars/Mangi-11/Eta?logo=github&amp;label=Stars&amp;color=1677FF" alt="GitHub Stars"></a> <a href="https://github.com/Mangi-11/Eta/releases"><img src="https://img.shields.io/github/downloads/Mangi-11/Eta/total?logo=github&amp;label=Downloads&amp;color=1677FF" alt="GitHub Releases 累计下载量"></a> <img src="https://img.shields.io/badge/minSdk-33-3DDC84?logo=android&amp;logoColor=white" alt="minSdk 33"> <img src="https://img.shields.io/badge/Assistant%20Integrations-ColorOS%20%26%20HyperOS-1677FF" alt="Assistant integrations for ColorOS and HyperOS"></p>
+
+<p align="center">
+  <a href="https://trendshift.io/repositories/116433"><img src="https://trendshift.io/api/badge/trendshift/repositories/116433/daily?language=Kotlin" alt="Eta · Trendshift Kotlin 日榜" width="250" height="55"></a>
+</p>
 
 Eta 是为手机和移动设备设计的 AI Agent，结合了 [Codex](https://openai.com/codex/) 这类 Coding Agent 自主规划与执行任务的能力，以及[豆包手机助手](https://o.doubao.com/)所展示的 GUI Agent 跨应用操作方式。它可以处理文件、执行命令、编写代码，也能深入 Android 系统与厂商应用，直接获取个人上下文、调用系统与一方应用的原生接口。
 
@@ -97,7 +101,7 @@ Eta 本体可以读取项目、修改代码、运行命令并验证结果。如�
 
 提供商列表还可从 [models.dev](https://models.dev/) 社区目录挑选兼容的对话服务和模型；联网时更新目录，离线时使用本地缓存或随应用打包的快照。导入后的提供商默认停用，需核对服务地址、填写该服务的 API Key 并启用；Eta 读取目录时不发送已保存的 API Key。
 
-Provider 层支持 OpenAI-compatible Chat Completions、Responses API 和 Anthropic Messages，包括 SSE、Tool Calling、图片输入与推理内容。你可以自定义服务地址、请求头和请求体，拉取或手动添加模型（拉取后从尚未添加的模型中勾选需要的加入），调整上下文长度与思考档位。具体能力取决于模型与接口，部分 Responses 提供商还可开启服务端网页搜索。
+Provider 层支持 OpenAI-compatible Chat Completions、Responses API、Anthropic Messages 和 Gemini 原生 Interactions API，包括 SSE、Tool Calling、图片输入与推理内容。你可以自定义服务地址、请求头和请求体，拉取或手动添加模型（拉取后从尚未添加的模型中勾选需要的加入），调整上下文长度与思考档位。具体能力取决于模型与接口，部分 Responses 提供商还可开启服务端网页搜索。
 
 聊天顶部菜单栏右侧用胶囊显示最近测得的上下文 token 数、模型窗口占比和最近一次成功模型请求的平均输出速度。速度采用服务商输出 token 数除以该次请求耗时，包含首字等待，排除工具执行与之前失败的重试；工具调用和上下文摘要请求也会更新统计，切换会话或重启后保留。服务商未返回对应数据时显示空缺，不按文字长度估算。
 
@@ -202,6 +206,17 @@ Eta 先从现有 Android 上的模型、上下文与工具做起。真正落地�
 - [Root 虚拟屏](docs/VIRTUAL_SCREEN.md)：实验虚拟屏与通知授权流程。
 - [HyperOS 系统入口](docs/HYPEROS_SYSTEM_ENTRY.md)：电源键、一圈即搜的适配条件与验证边界。
 - [终端原生组件](docs/TERMINAL_NATIVE.md)：PTY、PRoot 及随包源码的构建方式。
+
+## Star History
+
+<p align="center">
+  <a href="https://www.star-history.com/#Mangi-11/Eta&amp;Date">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=Mangi-11/Eta&amp;type=Date&amp;theme=dark">
+      <img src="https://api.star-history.com/svg?repos=Mangi-11/Eta&amp;type=Date" alt="Eta Star History" width="800">
+    </picture>
+  </a>
+</p>
 
 ## 参考与致谢
 

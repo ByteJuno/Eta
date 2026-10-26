@@ -1641,7 +1641,7 @@ internal class AgentAppState(
                         rewriteTargetMessageId = rewriteTargetMessageId,
                         runId = runId,
                         prompt = prompt,
-                        config = config,
+                        config = config.copy(supportsSearchSuggestions = true),
                         images = modelImages,
                         history = history,
                         handoff = AgentRuntimeWire.EntryHandoff(

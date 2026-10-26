@@ -88,6 +88,7 @@ private fun AgentOverlayState.projectEvent(event: AgentEvent): AgentOverlayState
         detailText = event.reason,
     )
 
+    is AgentEvent.SearchSuggestions,
     is AgentEvent.AssistantBlockEnd,
     is AgentEvent.AssistantReceived,
     is AgentEvent.ProviderResponseStarted,
