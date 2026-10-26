@@ -64,9 +64,9 @@ internal class AgentContextSession(
         val before = inputTokens
         // A failed automatic summary is not replayed again within this run. Manual requests remain explicit.
         if (!force && automaticCompactionFailed) return
-        if (AnthropicEphemeralState.hasPendingToolResponse(messages)) {
+        if (SignedToolContext.hasPendingResponse(messages)) {
             if (force) {
-                throw AgentContextCompactor.signedAnthropicToolRoundFailure()
+                throw SignedToolContext.compactionFailure(messages)
             }
             return
         }
