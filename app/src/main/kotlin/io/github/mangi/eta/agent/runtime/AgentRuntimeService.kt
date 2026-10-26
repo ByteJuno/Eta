@@ -1035,7 +1035,8 @@ internal class AgentRuntimeService : Service(), LifecycleOwner, SavedStateRegist
             response = completed.response,
             supplement = supplementText,
         )
-        ingestRunRequest(AgentRuntimeWire.IncomingRunRequest(continuationRequest, emptyList()), null)
+        // Built in-process from an Eta UI handoff, so it keeps the same presentation entitlements.
+        ingestRunRequest(AgentRuntimeWire.IncomingRunRequest(continuationRequest, emptyList()), null, isEtaProcess = true)
         return true
     }
 
