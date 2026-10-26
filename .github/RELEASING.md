@@ -1,3 +1,12 @@
+# Fork 当前构建约定（优先于下方历史说明）
+
+- 用户最终指定的集成与构建分支为 `virtual-screen`，不使用 `main` 构建。
+- 功能分支仅用于编辑和审查；获准改动合入 `virtual-screen` 后再构建。
+- 推送后执行：`gh workflow run android-release.yml --repo ByteJuno/Eta --ref virtual-screen`。
+- 核对运行提交号，验证 Lint、完整单元测试、Debug 和签名 Release；不自动安装或公开发布。
+- 这是执行约定。当前凭据缺少 workflow scope，工作流级分支限制未部署；已有 main push、标签与 PR 触发规则仍存在，避免触发这些入口。
+- 下方与本约定冲突的旧流程仅供历史参考。
+
 # Eta 发布流程
 
 ## Fork 开发测试约定
