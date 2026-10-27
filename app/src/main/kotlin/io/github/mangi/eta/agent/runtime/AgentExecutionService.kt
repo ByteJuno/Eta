@@ -75,7 +75,11 @@ internal class AgentExecutionService : Service() {
 
     override fun onDestroy() {
         floatingPreview?.close(); floatingPreview = null
-        if (instance === this) instance = null
+        if (instance === this) {
+            instance = null
+            runStatus = null
+            publishedStatusText = null
+        }
         // 销毁时同样收回本服务拥有的任务。回收在独立有界工作线程上完成，不阻塞 Main。
         stopQueue.close(leases.drainOwner(owner))
         super.onDestroy()
@@ -99,31 +103,46 @@ internal class AgentExecutionService : Service() {
     }
 
     private fun notification(): Notification {
-        val status = runStatus
+        val ids = leases.ids()
+        val agentCount = ids.count { it.startsWith("run:") }
+        val backgroundCommands = "terminal-background-commands" in ids
+        val status = runStatus.takeIf { agentCount > 0 }
         val open = PendingIntent.getActivity(
-            this, 0, Intent(this, if (io.github.mangi.eta.agent.display.VirtualScreenSession.isActive()) io.github.mangi.eta.agent.display.VirtualScreenViewerActivity::class.java else MainActivity::class.java),
+            this, 0, Intent(this, if (agentCount > 0 && io.github.mangi.eta.agent.display.VirtualScreenSession.isActive()) io.github.mangi.eta.agent.display.VirtualScreenViewerActivity::class.java else MainActivity::class.java).apply {
+                if (agentCount == 0 && backgroundCommands) action = MainActivity.ACTION_OPEN_TERMINAL
+            },
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
         val stop = PendingIntent.getService(
             this, 1, Intent(this, AgentExecutionService::class.java).setAction(ACTION_STOP),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
-        val taskCount = leases.count()
+        val currentProgress = progress.takeIf { progressOwner in ids && agentCount > 0 }.orEmpty()
         val builder = Notification.Builder(this, CHANNEL)
             .setSmallIcon(R.drawable.ic_notification)
-            .setContentTitle(getString(R.string.execution_title))
-            .setContentText(progress.ifBlank { status?.localizedText(resources)
-                ?: resources.getQuantityString(R.plurals.execution_summary, taskCount, taskCount) })
+            .setContentTitle(getString(when {
+                agentCount > 0 -> R.string.execution_title
+                backgroundCommands -> R.string.execution_background_title
+                else -> R.string.execution_session_title
+            }))
+            .setContentText(if (agentCount > 0) {
+                getString(R.string.execution_agent_count, agentCount) + " · " +
+                    currentProgress.ifBlank { status?.localizedText(resources).orEmpty() }
+            } else getString(if (backgroundCommands) R.string.execution_background_detail else R.string.execution_session_detail))
+            .setVisibility(Notification.VISIBILITY_PRIVATE)
             .setContentIntent(open)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .addAction(Notification.Action.Builder(null, getString(R.string.execution_stop), stop).build())
         // 只有 Agent run 在跑时才申请提升为 Live Update；终端会话、Linux 启动等长驻任务不属于"正在进行、需要持续关注"的活动。
         if (status != null && Build.VERSION.SDK_INT_FULL >= Build.VERSION_CODES_FULL.BAKLAVA_1) {
-            builder
+            runCatching { builder
                 .setStyle(Notification.ProgressStyle().setProgressIndeterminate(true))
                 .setShortCriticalText(status.shortText())
                 .setRequestPromotedOngoing(true)
+            }.onFailure { failure ->
+                AndroidAgentLogger.warn("Execution notification promotion failed: type=${failure.safeLogType()}")
+            }
         }
         return builder.build()
     }
@@ -193,6 +212,7 @@ internal class AgentExecutionService : Service() {
                 else -> return
             }
             mainHandler.post { instance?.let { service ->
+                if (id !in leases.ids()) return@let
                 if (tool.isNotBlank() || service.progressOwner == id) {
                     service.progressOwner = id
                     service.progress = tool.take(80)

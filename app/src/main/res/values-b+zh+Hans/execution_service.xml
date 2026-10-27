@@ -5,7 +5,12 @@
     <plurals name="execution_summary">
         <item quantity="other">%1$d 项任务正在运行，可返回 Eta 查看进度</item>
     </plurals>
-    <string name="execution_stop">停止运行任务</string>
+    <string name="execution_stop">停止全部登记任务</string>
     <string name="execution_chip_running">操作中</string>
     <string name="execution_chip_answering">回答中</string>
+    <string name="execution_background_title">后台命令运行中</string>
+    <string name="execution_session_title">终端/Linux 会话仍在运行</string>
+    <string name="execution_background_detail">聊天可能已结束，后台命令仍在执行；点击查看任务和日志。</string>
+    <string name="execution_session_detail">终端会话或 Linux 操作仍未结束，不表示助手仍在回答。</string>
+    <string name="execution_agent_count">%1$d 个助手任务</string>
 </resources>

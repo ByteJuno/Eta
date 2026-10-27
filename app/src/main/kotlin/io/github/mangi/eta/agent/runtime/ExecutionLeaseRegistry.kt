@@ -15,6 +15,7 @@ internal class ExecutionLeaseRegistry {
 
     @Synchronized fun release(id: String) { leases.remove(id) }
     @Synchronized fun count(): Int = leases.size
+    @Synchronized fun ids(): Set<String> = leases.keys.toSet()
 
     @Synchronized fun attachOwner(owner: Long) {
         activeOwner = owner

@@ -16,6 +16,39 @@ import org.robolectric.annotation.Config
 @Config(sdk = [33, 34], application = Application::class)
 class AgentExecutionServiceTest {
     @Test
+    fun backgroundLeaseIsNotPresentedAsAnAssistantRun() {
+        val context = org.robolectric.RuntimeEnvironment.getApplication()
+        AgentExecutionService.acquire(context, "terminal-background-commands", onStop = {})
+        val controller = Robolectric.buildService(AgentExecutionService::class.java).create()
+        try {
+            val notification = shadowOf(controller.get()).lastForegroundNotification
+            assertEquals(context.getString(io.github.mangi.eta.R.string.execution_background_title),
+                notification.extras.getString(android.app.Notification.EXTRA_TITLE))
+            assertEquals(android.app.Notification.VISIBILITY_PRIVATE, notification.visibility)
+        } finally {
+            AgentExecutionService.release("terminal-background-commands")
+            controller.destroy()
+        }
+    }
+
+    @Test
+    fun activeAgentLeaseTakesPrecedenceOverBackgroundLease() {
+        val context = org.robolectric.RuntimeEnvironment.getApplication()
+        AgentExecutionService.acquire(context, "terminal-background-commands", onStop = {})
+        AgentExecutionService.acquire(context, "run:test", onStop = {})
+        val controller = Robolectric.buildService(AgentExecutionService::class.java).create()
+        try {
+            val notification = shadowOf(controller.get()).lastForegroundNotification
+            assertEquals(context.getString(io.github.mangi.eta.R.string.execution_title),
+                notification.extras.getString(android.app.Notification.EXTRA_TITLE))
+        } finally {
+            AgentExecutionService.release("run:test")
+            AgentExecutionService.release("terminal-background-commands")
+            controller.destroy()
+        }
+    }
+
+    @Test
     fun foregroundExecutionUsesOnlyServiceTypesSupportedByThePlatform() {
         val controller = Robolectric.buildService(AgentExecutionService::class.java).create()
         try {
