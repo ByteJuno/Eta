@@ -10,6 +10,61 @@ import org.junit.Test
 
 class AgentContextCompactionTest {
     @Test
+    fun oversizedCompleteSummaryIsRefinedWithoutReplayingHistory() {
+        var requests = 0
+        val draft = "摘要事实".repeat(3_001)
+        val usages = mutableListOf<AgentTokenUsage>()
+        val summarizer = AgentContextSummarizer(config, provider { request, emit ->
+            requests++
+            assertEquals(ProviderRequestPurpose.COMPACTION, request.purpose)
+            assertEquals(0, request.effectiveTools.length())
+            assertTrue(request.messages.getJSONObject(0).getString("content").contains("8000"))
+            emit(ProviderEvent.Usage(AgentTokenUsage(inputTokens = 100)))
+            if (requests == 1) {
+                assertTrue(request.messages.toString().contains("ORIGINAL_HISTORY_ONLY"))
+                response(draft)
+            } else {
+                assertEquals(2, requests)
+                assertFalse(request.messages.toString().contains("ORIGINAL_HISTORY_ONLY"))
+                assertTrue(request.messages.getJSONObject(1).getString("content").endsWith(draft))
+                response("保留目标与关键结果。")
+            }
+        }, AgentRunController(), false, usages::add)
+        assertEquals("保留目标与关键结果。", summarizer.summarize(listOf(
+            AgentModelClient.ConversationMessage("assistant", "ORIGINAL_HISTORY_ONLY"))))
+        assertEquals(2, requests)
+        assertEquals(2, usages.size)
+    }
+
+    @Test
+    fun refinementFailureNeverCommitsOrTruncatesOriginalContext() {
+        for ((text, stop) in listOf("长".repeat(12_001) to "stop", "" to "stop", "半截" to "length")) {
+            val original = jsonHistory()
+            val before = original.toString()
+            var requests = 0
+            val session = AgentContextSession(config, original, 1, "operation", provider { _, _ ->
+                requests++
+                if (requests == 1) response("长".repeat(12_001)) else response(text, stop)
+            }, AgentRunController(), { emptySet() }, {}, { fail("Must not commit failed refinement") })
+            assertThrows(AgentModelFailure::class.java) { session.compact(force = true) }
+            assertEquals(2, requests)
+            assertEquals(before, original.toString())
+            assertNull(session.snapshot())
+        }
+    }
+
+    @Test
+    fun summaryAtHardLimitNeedsNoRefinement() {
+        var requests = 0
+        val result = AgentContextSummarizer(config, provider { _, _ ->
+            requests++
+            response("字".repeat(12_000))
+        }, AgentRunController(), false).summarize(history())
+        assertEquals(12_000, result.length)
+        assertEquals(1, requests)
+    }
+
+    @Test
     fun failedAutomaticSummaryIsNotRepeatedWithinRunButManualRetryIsAllowed() {
         var requests = 0
         val original = jsonHistory()

@@ -138,7 +138,7 @@ class AgentContextRecoveryTest {
                 content.isEmpty() -> "CONTEXT_SUMMARY_EMPTY"
                 else -> "CONTEXT_SUMMARY_TOO_LONG"
             }, failure.code)
-            assertEquals(1, requests)
+            assertEquals(if (content.length > 12_000 && stop == "stop") 2 else 1, requests)
             assertEquals(original, messages.toString())
         }
     }
