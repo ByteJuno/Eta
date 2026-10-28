@@ -72,6 +72,7 @@ internal class AgentRuntimeRunExecutor(
         request: AgentRuntimeWire.RunRequest,
     ): Outcome {
         val runController = session.controller
+        val displayControl = io.github.mangi.eta.agent.display.VirtualScreenSession.registerRunController(request.runId, runController)
         val archivedEvents = AgentRunArchiveStore.createEventBuffer(request.handoff)
             ?: reviewGeneration?.let { mutableListOf<AgentEvent>() }
         var entrySurfaceGuard: EntrySurfaceGuard? = null
@@ -395,6 +396,7 @@ internal class AgentRuntimeRunExecutor(
         } finally {
             runCatching { toolsBinding?.close() }
             runCatching { toolExecutor?.close() }
+            runCatching { displayControl.close() }
         }
 
         if (cancelled && session.isTerminal) {

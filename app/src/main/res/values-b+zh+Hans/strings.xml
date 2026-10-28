@@ -1442,7 +1442,9 @@
     <string name="virtual_screen_touch_hint">可直接点击、长按和滑动画面；蓝色指示显示这块屏幕上的操作。</string>
     <string name="virtual_screen_input_failed">操作未完成，虚拟屏可能已关闭或许可已变化。</string>
     <string name="virtual_screen_app_back">返回应用</string>
-    <string name="virtual_screen_touch_on">触控已开启</string>
+    <string name="virtual_screen_touch_on">人工接管（暂停任务）</string>
+    <string name="virtual_screen_manual_control">人工接管中</string>
+    <string name="virtual_screen_manual_pending">正在交接控制…</string>
     <string name="virtual_screen_touch_off">仅查看</string>
     <string name="automation_daily">每天 %1$s（%2$s）</string>
     <string name="automation_interval">每隔 %1$d 分钟</string>

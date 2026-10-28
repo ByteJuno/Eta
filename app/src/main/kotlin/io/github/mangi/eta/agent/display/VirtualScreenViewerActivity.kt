@@ -97,6 +97,17 @@ internal class VirtualScreenViewerActivity : ComponentActivity() {
     private var textInputVisible by mutableStateOf(false)
     private var textDraft by mutableStateOf("")
     private var textPending by mutableStateOf(false)
+    private var resumed = false
+    private var controlSession: String? = null
+
+    private fun syncControl() {
+        val next = VirtualScreenSession.state.value.display?.sessionId.takeIf { resumed && interactionEnabled }
+        if (controlSession == next) return
+        surface?.cancelGesture()
+        controlSession?.let { VirtualScreenSession.requestManualControl(this, it, viewerId, false) }
+        controlSession = next
+        next?.let { VirtualScreenSession.requestManualControl(this, it, viewerId, true) }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -110,13 +121,20 @@ internal class VirtualScreenViewerActivity : ComponentActivity() {
             repeatOnLifecycle(Lifecycle.State.RESUMED) {
                 launch {
                     VirtualScreenSession.state.collect { state ->
+                        syncControl()
                         if (state.display == null) { surface?.clearFrame(); hasFrame = false; lastFrameId = 0 }
+                        surface?.setLiveTarget(state.display, state.display?.let { VirtualScreenSession.liveChannel(it.sessionId) })
                         surface?.showGesture(state.gesture)
                     }
                 }
                 while (true) {
                     val info = VirtualScreenSession.state.value.display
                     if (info != null) {
+                        if (surface?.isLive == true) {
+                            withContext(Dispatchers.IO) { VirtualScreenSession.probeForViewer(this@VirtualScreenViewerActivity) }
+                            delay(500)
+                            continue
+                        }
                         val next = readFrame()
                         if (VirtualScreenSession.state.value.display?.sessionId == info.sessionId) {
                             if (next != null) {
@@ -172,10 +190,12 @@ internal class VirtualScreenViewerActivity : ComponentActivity() {
     }
 
     private fun sendInput(sessionId: String, args: JSONObject) {
+        val token = VirtualScreenSession.manualGestureToken(sessionId, viewerId) ?: return
+        if (!args.has("controlGeneration")) args.put("controlGeneration", token.toLong())
         inputError = false
         lifecycleScope.launch {
             val result = withContext(Dispatchers.IO) {
-                VirtualScreenSession.inputForViewer(this@VirtualScreenViewerActivity, sessionId, args)
+                VirtualScreenSession.inputForViewer(this@VirtualScreenViewerActivity, sessionId, args, viewerId)
             }
             inputError = !JSONObject(result.content).optBoolean("ok")
         }
@@ -184,13 +204,14 @@ internal class VirtualScreenViewerActivity : ComponentActivity() {
     private fun sendText(sessionId: String) {
         val text = textDraft
         if (text.isEmpty() || textPending) return
+        val token = VirtualScreenSession.manualGestureToken(sessionId, viewerId) ?: return
         textPending = true
         inputError = false
         lifecycleScope.launch {
             try {
                 val result = withContext(Dispatchers.IO) {
                     VirtualScreenSession.inputForViewer(this@VirtualScreenViewerActivity, sessionId,
-                        JSONObject().put("action", "text").put("text", text))
+                        JSONObject().put("action", "text").put("text", text).put("controlGeneration", token.toLong()), viewerId)
                 }
                 inputError = !JSONObject(result.content).optBoolean("ok")
                 if (!inputError && VirtualScreenSession.state.value.display?.sessionId == sessionId) textDraft = ""
@@ -202,6 +223,7 @@ internal class VirtualScreenViewerActivity : ComponentActivity() {
     private fun ViewerScreen() {
         val state by VirtualScreenSession.state.collectAsState()
         val display = state.display
+        val canInput = interactionEnabled && state.manualControlReady
         val focus = remember { FocusRequester() }
         val focusManager = LocalFocusManager.current
         val keyboard = LocalSoftwareKeyboardController.current
@@ -220,12 +242,12 @@ internal class VirtualScreenViewerActivity : ComponentActivity() {
                         }
                     },
                     actions = {
-                        IconButton(enabled = display != null, onClick = { textInputVisible = !textInputVisible }) {
+                        IconButton(enabled = display != null && canInput, onClick = { textInputVisible = !textInputVisible }) {
                             Icon(Icons.Outlined.Keyboard, stringResource(R.string.virtual_screen_text_toggle),
                                 tint = if (textInputVisible) MiuixTheme.colorScheme.primary else MiuixTheme.colorScheme.onSurfaceVariantSummary,
                                 modifier = Modifier.size(22.dp))
                         }
-                        IconButton(onClick = { interactionEnabled = !interactionEnabled }) {
+                        IconButton(onClick = { interactionEnabled = !interactionEnabled; syncControl() }) {
                             Icon(
                                 imageVector = if (interactionEnabled) Icons.Outlined.TouchApp else Icons.Outlined.Block,
                                 contentDescription = stringResource(if (interactionEnabled) R.string.virtual_screen_touch_on else R.string.virtual_screen_touch_off),
@@ -253,11 +275,23 @@ internal class VirtualScreenViewerActivity : ComponentActivity() {
                                     factory = { context ->
                                         VirtualScreenSurfaceView(context).also {
                                             it.onInput = ::sendInput
+                                            it.onManualDown = { id -> VirtualScreenSession.manualGestureToken(id, viewerId) }
+                                            it.onManualComplete = { id, token -> VirtualScreenSession.finishManualGesture(id, viewerId, token) }
+                                            it.onLiveChanged = { live ->
+                                                VirtualScreenSession.state.value.display?.sessionId?.let { id ->
+                                                    VirtualScreenSession.setViewerLive(id, viewerId, live)
+                                                }
+                                                hasFrame = live
+                                                if (!live) lastFrameId = 0
+                                            }
+                                            it.onError = { inputError = true }
+                                            it.setResumed(resumed)
+                                            it.setLiveTarget(display, display?.let { info -> VirtualScreenSession.liveChannel(info.sessionId) })
                                             it.contentDescription = context.getString(R.string.virtual_screen_touch_description)
                                             surface = it
                                         }
                                     },
-                                    update = { it.touchEnabled = interactionEnabled },
+                                    update = { it.touchEnabled = canInput && resumed },
                                     modifier = Modifier.fillMaxSize(),
                                 )
                                 if (!hasFrame) {
@@ -276,9 +310,9 @@ internal class VirtualScreenViewerActivity : ComponentActivity() {
                         if (textInputVisible) Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             TextField(value = textDraft, onValueChange = { if (it.length <= 20000) textDraft = it },
-                                label = stringResource(R.string.virtual_screen_text_placeholder), enabled = !textPending,
+                                label = stringResource(R.string.virtual_screen_text_placeholder), enabled = !textPending && canInput,
                                 modifier = Modifier.weight(1f).focusRequester(focus), maxLines = 3)
-                            IconButton(enabled = display != null && textDraft.isNotEmpty() && !textPending,
+                            IconButton(enabled = display != null && canInput && textDraft.isNotEmpty() && !textPending,
                                 onClick = {
                                     keyboard?.hide()
                                     focusManager.clearFocus()
@@ -292,7 +326,7 @@ internal class VirtualScreenViewerActivity : ComponentActivity() {
                         }
                         Row(Modifier.fillMaxWidth().padding(vertical = 2.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
                             listOf("BACK" to R.string.action_back, "HOME" to R.string.virtual_screen_home, "MENU" to R.string.virtual_screen_menu).forEach { (key, label) ->
-                                IconButton(enabled = display != null && interactionEnabled, onClick = {
+                                IconButton(enabled = display != null && canInput, onClick = {
                                     display?.let { sendInput(it.sessionId, JSONObject().put("action", "key").put("button", key)) }
                                 }, modifier = Modifier.size(40.dp)) { NavigationKey(key, stringResource(label)) }
                             }
@@ -324,13 +358,24 @@ internal class VirtualScreenViewerActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+        resumed = true
         VirtualScreenSession.setViewerVisible(viewerId, true)
+        surface?.setResumed(true)
+        syncControl()
     }
 
     override fun onPause() {
+        resumed = false
+        surface?.setResumed(false)
+        syncControl()
         VirtualScreenSession.setViewerVisible(viewerId, false)
         surface?.clearFrame(); hasFrame = false; lastFrameId = 0
         super.onPause()
+    }
+
+    override fun onDestroy() {
+        surface?.dispose(); surface = null
+        super.onDestroy()
     }
 }
 
@@ -341,7 +386,9 @@ private fun TaskIndicator(state: VirtualScreenViewerState, onClick: () -> Unit) 
         VirtualScreenTaskPhase.FAILED -> MiuixTheme.colorScheme.error
         else -> MiuixTheme.colorScheme.onSurfaceVariantSummary
     }
-    val label = when (state.taskPhase) {
+    val label = if (state.manualControl) {
+        if (state.manualControlReady) R.string.virtual_screen_manual_control else R.string.virtual_screen_manual_pending
+    } else when (state.taskPhase) {
         VirtualScreenTaskPhase.RUNNING -> R.string.virtual_screen_live
         VirtualScreenTaskPhase.COMPLETED -> R.string.virtual_screen_completed
         VirtualScreenTaskPhase.FAILED -> R.string.virtual_screen_failed

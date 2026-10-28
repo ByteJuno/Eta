@@ -1464,7 +1464,9 @@
     <string name="virtual_screen_touch_hint">Tap, hold or swipe the preview. Blue indicators show actions on this screen.</string>
     <string name="virtual_screen_input_failed">Input was not completed. The screen may have closed or permission may have changed.</string>
     <string name="virtual_screen_app_back">Back in app</string>
-    <string name="virtual_screen_touch_on">Touch enabled</string>
+    <string name="virtual_screen_touch_on">Manual control (pause task)</string>
+    <string name="virtual_screen_manual_control">Manual control</string>
+    <string name="virtual_screen_manual_pending">Switching control…</string>
     <string name="virtual_screen_touch_off">View only</string>
     <string name="automation_daily">Daily at %1$s (%2$s)</string>
     <string name="automation_interval">Every %1$d minutes</string>

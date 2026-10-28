@@ -40,8 +40,10 @@ internal data class VirtualScreenViewerState(
     val activeRunId: String? = null,
     val operations: List<VirtualScreenOperation> = emptyList(),
     val fullViewerVisible: Boolean = false,
+    val manualControl: Boolean = false,
+    val manualControlReady: Boolean = false,
 ) {
-    val isAgentControlling: Boolean get() = display != null && taskPhase == VirtualScreenTaskPhase.RUNNING
+    val isAgentControlling: Boolean get() = display != null && taskPhase == VirtualScreenTaskPhase.RUNNING && !manualControl
 
     fun beginRun(runId: String) = copy(taskPhase = VirtualScreenTaskPhase.RUNNING, activeRunId = runId)
 

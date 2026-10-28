@@ -1,5 +1,15 @@
 # 第三方声明
 
+## android-virtual-screen 虚拟屏预览与输入
+
+原生镜像、实时触控、输入流校验及输入抢占实现改编自
+[lejw0925/android-virtual-screen](https://github.com/lejw0925/android-virtual-screen/tree/1b7e2a64b6dfe3be97f1b81287e9f4c21a8a2f91)
+（提交 `1b7e2a64b6dfe3be97f1b81287e9f4c21a8a2f91`）。Eta 适配了会话绑定的 Binder 通道、人工控制代次及对应运行的暂停租约。
+来源项目采用 PolyForm Noncommercial License 1.0.0；许可及来源随 APK 保存在
+`assets/licenses/android-virtual-screen.txt`，并保留原文通知：
+
+Required Notice: Copyright © 2026 蛮吉 (Mangi-11).
+
 ## 终端原生组件
 
 Eta 的免 Root Linux 后端以独立进程运行 [PRoot](https://github.com/termux/proot)，并静态链接 [talloc](https://talloc.samba.org/) 与 [libandroid-shmem](https://github.com/termux/libandroid-shmem)。PRoot 源码采用 GPL-2.0-or-later；talloc 采用 LGPL-3.0-or-later；libandroid-shmem 采用 BSD-3-Clause。附带的组合 PRoot 可执行程序按 GPL-3.0-or-later 分发，各组件版权与许可证保留。

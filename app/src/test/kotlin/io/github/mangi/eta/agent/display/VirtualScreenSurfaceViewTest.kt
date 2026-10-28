@@ -22,6 +22,21 @@ import org.robolectric.annotation.GraphicsMode
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class VirtualScreenSurfaceViewTest {
     @Test
+    fun unacknowledgedTakeoverAndBackgroundViewerCannotInject() {
+        val inputs = mutableListOf<JSONObject>()
+        val view = view(inputs)
+        view.onManualDown = { null }
+        touch(view, MotionEvent.ACTION_DOWN, 500f, 1000f, 1000)
+        touch(view, MotionEvent.ACTION_UP, 500f, 1000f, 1100)
+        view.onManualDown = { "1" }
+        touch(view, MotionEvent.ACTION_DOWN, 500f, 1000f, 2000)
+        view.setResumed(false)
+        touch(view, MotionEvent.ACTION_UP, 500f, 1000f, 2100)
+        assertTrue(inputs.isEmpty())
+        view.dispose()
+    }
+
+    @Test
     fun tapsAndLongPressesUseScaledDisplayCoordinates() {
         val inputs = mutableListOf<JSONObject>()
         val view = view(inputs)
@@ -103,6 +118,8 @@ class VirtualScreenSurfaceViewTest {
     fun clockwisePreviewRendersPixelsAtTheCoordinatesUsedForInput() {
         val inputs = mutableListOf<JSONObject>()
         val view = VirtualScreenSurfaceView(RuntimeEnvironment.getApplication())
+        view.setResumed(true)
+        view.onManualDown = { "1" }
         resize(view, 200, 400)
         val source = Bitmap.createBitmap(4, 2, Bitmap.Config.ARGB_8888).apply {
             for (x in 0 until 4) {
@@ -161,7 +178,7 @@ class VirtualScreenSurfaceViewTest {
             VirtualDisplayInfo("session", "run", 3, 1600, 800, rotation = 1))
         view.showGesture(VirtualScreenGesture(1, "session", "tap", 320, 199,
             startedAt = SystemClock.elapsedRealtime()))
-        val host = view.getChildAt(1) as FrameLayout
+        val host = view.getChildAt(2) as FrameLayout
         val indicator = host.getChildAt(0)
         val params = indicator.layoutParams as FrameLayout.LayoutParams
         assertEquals(750, params.leftMargin + params.width / 2)
@@ -196,7 +213,9 @@ class VirtualScreenSurfaceViewTest {
 
     private fun view(inputs: MutableList<JSONObject>) =
         VirtualScreenSurfaceView(RuntimeEnvironment.getApplication()).apply {
-            layout(0, 0, 1000, 2000)
+            setResumed(true)
+            onManualDown = { "1" }
+            resize(this, 1000, 2000)
             setFrame(
                 Bitmap.createBitmap(720, 1280, Bitmap.Config.ARGB_8888),
                 VirtualDisplayInfo("session", "run", 3, 720, 1280)
@@ -211,11 +230,14 @@ class VirtualScreenSurfaceViewTest {
     }
 
     private fun touch(view: VirtualScreenSurfaceView, action: Int, x: Float, y: Float, time: Long) {
-        val event = MotionEvent.obtain(1000, time, action, x, y, 0)
+        if (action == MotionEvent.ACTION_DOWN) touchDownTime = time
+        val event = MotionEvent.obtain(touchDownTime, time, action, x, y, 0)
         try {
             view.onTouchEvent(event)
         } finally {
             event.recycle()
         }
     }
+
+    private var touchDownTime = 0L
 }

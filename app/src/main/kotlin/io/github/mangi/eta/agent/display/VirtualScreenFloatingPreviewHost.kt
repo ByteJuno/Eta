@@ -156,7 +156,13 @@ internal class VirtualScreenFloatingPreviewHost(private val context: Context) : 
             }
         }, LinearLayout.LayoutParams(dp(32), dp(30)))
         column.addView(header)
-        val image = VirtualScreenSurfaceView(windowContext).apply { touchEnabled = false }
+        val image = VirtualScreenSurfaceView(windowContext).apply {
+            touchEnabled = false
+            onLiveChanged = { live ->
+                state.display?.sessionId?.let { VirtualScreenSession.setViewerLive(it, viewerId, live) }
+                if (!live) lastFrame = 0
+            }
+        }
         column.addView(image, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f))
         container.addView(column, FrameLayout.LayoutParams(-1, -1))
         val pill = TextView(windowContext).apply {
@@ -216,6 +222,7 @@ internal class VirtualScreenFloatingPreviewHost(private val context: Context) : 
             manager.addView(container, layout)
             root = container; surface = image; expanded = column; folded = pill; params = layout
         } catch (error: RuntimeException) {
+            image.dispose()
             AndroidAgentLogger.warn("Virtual floating preview unavailable: type=${error.javaClass.simpleName}")
         }
     }
@@ -247,9 +254,17 @@ internal class VirtualScreenFloatingPreviewHost(private val context: Context) : 
         if (capture?.isActive == true || root == null || collapsed) return
         val token = ++generation
         VirtualScreenSession.setViewerVisible(viewerId, true, preview = true)
+        surface?.setResumed(true)
         capture = scope.launch {
             try {
                 while (isActive && token == generation && root != null && !collapsed) {
+                    val info = state.display
+                    surface?.setLiveTarget(info, info?.let { VirtualScreenSession.liveChannel(it.sessionId) })
+                    if (surface?.isLive == true) {
+                        withContext(Dispatchers.IO) { VirtualScreenSession.probeForViewer(context) }
+                        delay(500)
+                        continue
+                    }
                     val pending = AtomicReference<Bitmap?>()
                     try {
                         val session = state.display?.sessionId
@@ -286,6 +301,7 @@ internal class VirtualScreenFloatingPreviewHost(private val context: Context) : 
             } finally {
                 if (token == generation) {
                     VirtualScreenSession.setViewerVisible(viewerId, false, preview = true)
+                    surface?.setResumed(false)
                     capture = null
                     surface?.clearFrame()
                     lastFrame = 0
@@ -296,6 +312,7 @@ internal class VirtualScreenFloatingPreviewHost(private val context: Context) : 
 
     private fun stopCapture() {
         generation++; capture?.cancel(); capture = null
+        surface?.setResumed(false)
         VirtualScreenSession.setViewerVisible(viewerId, false, preview = true)
         surface?.clearFrame(); lastFrame = 0
     }
@@ -303,6 +320,7 @@ internal class VirtualScreenFloatingPreviewHost(private val context: Context) : 
     private fun removeWindow() {
         folding?.cancel(); folding = null
         stopCapture()
+        surface?.dispose()
         params?.let { position = FloatingPreviewPlacement.Position(it.x, it.y, edge) }
         root?.let { runCatching { manager.removeViewImmediate(it) } }
         root = null; surface = null; expanded = null; folded = null; params = null

@@ -39,6 +39,9 @@ internal object RootDisplayCommandMain {
         var wakeLock: PowerManager.WakeLock? = null
         var recoveryWakeLock: PowerManager.WakeLock? = null
         var rotationListener: VirtualScreenAppRotation? = null
+        var liveMirror: VirtualScreenDisplayMirror? = null
+        var liveRegistration: VirtualScreenRootLiveRegistration? = null
+        var inputResource: VirtualScreenInputInjector? = null
         try {
             require(Process.myUid() == 0) { "ROOT_REQUIRED" }
             if (Looper.myLooper() == null) Looper.prepareMainLooper()
@@ -104,6 +107,14 @@ internal object RootDisplayCommandMain {
             val localIme = configureLocalIme(id)
             val textInput = VirtualScreenRootTextInput(id)
             val inputInjector = VirtualScreenInputInjector(id)
+            inputResource = inputInjector
+            val mirror = VirtualScreenDisplayMirror(display.display, inputInjector,
+                allowed = { displayManager.getDisplay(id) != null && (allowOff || power.isInteractive && !keyguard.isDeviceLocked) },
+                onActivity = { idleTimer.touch() })
+            liveMirror = mirror
+            if (setup.optString("bridgeNonce").isNotBlank()) {
+                liveRegistration = runCatching { VirtualScreenRootLiveRegistration(mirror, setup) }.getOrNull()
+            }
             if (allowOff) {
                 wakeLock = power.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "Eta:virtual-task")
                     .apply { acquire() }
@@ -116,6 +127,7 @@ internal object RootDisplayCommandMain {
                     .put("independentFocus", true)
                     .put("displayPowerScope", recoveryWakeLock != null)
                     .put("localIme", localIme)
+                    .put("livePreview", liveRegistration != null)
             )
             while (true) {
                 val line = input.readLine() ?: break
@@ -136,7 +148,15 @@ internal object RootDisplayCommandMain {
                         continue
                     }
                     require(displayManager.getDisplay(id) != null) { "DISPLAY_GONE" }
+                    if (request.optString("action") == "manual_control") {
+                        mirror.setManualControl(request.getLong("controlGeneration"), request.getBoolean("enabled"))
+                        reply(JSONObject().put("ok", true))
+                        continue
+                    }
                     require(allowOff || (power.isInteractive && !keyguard.isDeviceLocked)) { "SCREEN_OFF_PERMISSION_REQUIRED" }
+                    if (request.optString("action") in setOf("tap", "swipe", "long_press", "back", "key", "text", "launch", "restart", "switch_task")) {
+                        require(!mirror.isManualControl || request.optBoolean("manual")) { "UI_MANUAL_CONTROL" }
+                    }
                     appRotation.synchronize(runningTasks().firstOrNull { taskDisplayId(it) == id })
                     val size = Point().also { display.display.getRealSize(it) }
                     val logicalWidth = size.x
@@ -373,6 +393,9 @@ internal object RootDisplayCommandMain {
                 put("debug_cause_message", error.cause?.message?.take(300))
             })
         } finally {
+            runCatching { liveRegistration?.close() }
+            runCatching { liveMirror?.close() }
+            runCatching { inputResource?.close() }
             runCatching { rotationListener?.close() }
             runCatching { display?.release() }
             runCatching { capture?.close() }

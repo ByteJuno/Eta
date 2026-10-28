@@ -1416,7 +1416,9 @@
     <string name="virtual_screen_touch_hint">可直接點擊、長按和滑動畫面；藍色指示顯示這塊螢幕上的操作。</string>
     <string name="virtual_screen_input_failed">操作未完成，虛擬螢幕可能已關閉或許可已變更。</string>
     <string name="virtual_screen_app_back">返回應用</string>
-    <string name="virtual_screen_touch_on">觸控已開啟</string>
+    <string name="virtual_screen_touch_on">人工接管（暫停任務）</string>
+    <string name="virtual_screen_manual_control">人工接管中</string>
+    <string name="virtual_screen_manual_pending">正在交接控制…</string>
     <string name="virtual_screen_touch_off">僅查看</string>
     <string name="automation_daily">每天 %1$s（%2$s）</string>
     <string name="automation_interval">每隔 %1$d 分鐘</string>

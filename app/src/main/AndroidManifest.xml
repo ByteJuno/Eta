@@ -200,6 +200,14 @@
             </intent-filter>
         </service>
 
+        <!-- Only UID 0 with an app-generated pending nonce can register the display Binder. -->
+        <provider
+            android:name=".agent.display.VirtualScreenRootBridgeProvider"
+            android:authorities="${applicationId}.display-bridge"
+            android:exported="true"
+            android:grantUriPermissions="false"
+            tools:ignore="ExportedContentProvider" />
+
         <provider
             android:name=".agent.accessibility.AgentAccessibilityHealthProvider"
             android:authorities="io.github.mangi.eta.accessibility.health"

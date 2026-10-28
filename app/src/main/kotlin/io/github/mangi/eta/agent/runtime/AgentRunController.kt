@@ -24,9 +24,29 @@ internal class AgentRunController {
     private var acceptingSteering = true
     @Volatile
     private var paused = false
+    private val pauseHolds = mutableSetOf<Any>()
+    @Volatile private var hasPauseHolds = false
 
     val isPaused: Boolean
-        get() = paused
+        get() = paused || hasPauseHolds
+
+    /** A viewer pause is independent of the user's pause/resume button. */
+    fun holdPause(): ResourceBinding {
+        val token = Any()
+        lock.withLock {
+            if (!cancelled) {
+                pauseHolds.add(token)
+                hasPauseHolds = true
+            }
+        }
+        return ResourceBinding {
+            lock.withLock {
+                pauseHolds.remove(token)
+                hasPauseHolds = pauseHolds.isNotEmpty()
+                pauseCondition.signalAll()
+            }
+        }
+    }
 
     fun cancel() {
         lock.withLock {
@@ -35,6 +55,8 @@ internal class AgentRunController {
             steeringMessages.clear()
             queuedMessages.clear()
             paused = false
+            pauseHolds.clear()
+            hasPauseHolds = false
             pauseCondition.signalAll()
         }
         resources.forEach { resource ->
@@ -104,7 +126,7 @@ internal class AgentRunController {
      */
     fun throwIfCancelled() {
         lock.withLock {
-            while (paused && !cancelled) {
+            while ((paused || hasPauseHolds) && !cancelled) {
                 try {
                     pauseCondition.await()
                 } catch (_: InterruptedException) {

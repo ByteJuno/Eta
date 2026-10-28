@@ -6,6 +6,9 @@ import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.ExecutionException
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicReference
+import kotlin.concurrent.thread
+import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertThrows
@@ -18,6 +21,40 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
 class VirtualScreenInputInjectorTest {
+    @Test
+    fun manualTakeoverCancelsPressedFingerBeforeAnotherInput() {
+        val pressed = CountDownLatch(1)
+        val events = CopyOnWriteArrayList<Int>()
+        val result = AtomicReference<JSONObject>()
+        val injector = VirtualScreenInputInjector(96, dispatch = { event, _ ->
+            events += (event as MotionEvent).actionMasked
+            true
+        }, pause = { pressed.countDown(); CountDownLatch(1).await() })
+        val worker = thread(isDaemon = true) { result.set(injector.execute("tap", "90", "88")) }
+        try {
+            assertTrue(pressed.await(1, TimeUnit.SECONDS))
+            assertTrue(injector.cancelActive())
+            worker.join(1000)
+            assertFalse(worker.isAlive)
+            assertEquals("UI_MANUAL_CONTROL", result.get().getString("code"))
+            assertEquals(listOf(MotionEvent.ACTION_DOWN, MotionEvent.ACTION_CANCEL), events.toList())
+        } finally { injector.close(); worker.join(1000) }
+    }
+
+    @Test
+    fun tapRetainsMinimumPressTime() {
+        var now = 100L
+        val events = CopyOnWriteArrayList<Pair<Int, Long>>()
+        val injector = VirtualScreenInputInjector(96, dispatch = { event, _ ->
+            events += (event as MotionEvent).actionMasked to event.eventTime
+            true
+        }, uptimeMillis = { now }, pause = { now += it })
+        try {
+            assertTrue(injector.execute("tap", "20", "30").getBoolean("ok"))
+            assertTrue(events.last().second - events.first().second >= 50)
+        } finally { injector.close() }
+    }
+
     @Test
     fun completedInputDoesNotClaimBusinessSuccess() {
         val actions = CopyOnWriteArrayList<Int>()
@@ -43,7 +80,7 @@ class VirtualScreenInputInjectorTest {
         val result = injector.execute("tap", "90", "88")
         assertFalse(result.getBoolean("ok"))
         assertEquals("INPUT_DISPATCH_UNCONFIRMED", result.getString("code"))
-        assertEquals(listOf(MotionEvent.ACTION_DOWN, MotionEvent.ACTION_UP), actions.toList())
+        assertEquals(listOf(MotionEvent.ACTION_DOWN, MotionEvent.ACTION_CANCEL), actions.toList())
     }
 
     @Test
