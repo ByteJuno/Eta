@@ -276,7 +276,7 @@ internal class AgentRuntimeRunExecutor(
                 request.config.subagentTools && currentPermissions().subagentTools
             }
             val subagentExecutor = SubagentExecutor(
-                conversationKey = browserKey,
+                conversationKey = request.virtualScreenOwner,
                 parentController = runController,
                 configProvider = {
                     val rawSubagentConfig = runBlocking {
