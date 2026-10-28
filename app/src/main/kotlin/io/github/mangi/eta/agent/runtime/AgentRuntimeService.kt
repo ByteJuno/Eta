@@ -143,10 +143,7 @@ internal class AgentRuntimeService : Service(), LifecycleOwner, SavedStateRegist
             set(next) {
                 holder.value = next
                 activeSession?.let { runs.active(it.runId)?.overlayState = next }
-                AgentExecutionService.updateRunStatus(
-                    this@AgentRuntimeService,
-                    next.status.takeIf { activeSession?.isTerminal == false },
-                )
+                publishExecutionState()
             }
     }
     private val capsuleExpanded = mutableStateOf(false)
@@ -188,6 +185,7 @@ internal class AgentRuntimeService : Service(), LifecycleOwner, SavedStateRegist
 
     override fun onCreate() {
         super.onCreate()
+        activeInstance = this
         savedStateRegistryController.performRestore(null)
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_CREATE)
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_START)
@@ -217,6 +215,8 @@ internal class AgentRuntimeService : Service(), LifecycleOwner, SavedStateRegist
     }
 
     override fun onDestroy() {
+        destroyed = true
+        if (activeInstance === this) activeInstance = null
         // 经验复盘由自己的执行引用持有；文字任务关闭入口服务后仍可完成。
         setKeepScreenOn(false)
         runs.pendingValues().forEach { pending ->
@@ -236,6 +236,7 @@ internal class AgentRuntimeService : Service(), LifecycleOwner, SavedStateRegist
         }
         activeSession = null
         // Deliver cancellation messages already queued above before retiring the worker.
+        publishExecutionState()
         resultIo.shutdown()
         mainHandler.removeCallbacksAndMessages(null)
         AgentOverlayClearance.detach(clearanceHost)
@@ -1070,6 +1071,35 @@ internal class AgentRuntimeService : Service(), LifecycleOwner, SavedStateRegist
                 !session.isTerminal && !session.controller.isCancelled && !session.controller.isPaused
             },
         )
+        publishExecutionState()
+    }
+
+    private var destroyed = false
+
+    private fun publishExecutionState() {
+        val active = runs.activeValues().filterNot { it.session.isTerminal }
+        val selected = active.firstOrNull { it.session === activeSession }
+        val owner = active.firstOrNull { it.hasInteractionLease }
+        val run = owner ?: selected ?: active.firstOrNull()
+        val status = run?.let {
+            if (it.session.controller.isPaused) AgentOverlayStatus.Paused else it.overlayState.status
+        }
+        AgentExecutionService.updateRunStatus(this, status)
+    }
+
+    private fun handleEtaUiVisibilityChanged() {
+        if (destroyed) return
+        if (resultCardView != null) {
+            if (EtaMainVisibility.visible) dismissAndStop()
+            return
+        }
+        val run = activeSession?.let { runs.active(it.runId) } ?: return
+        if (AgentOverlayVisibilityPolicy.shouldSuppressOverlayInEtaUi(
+                run.request.handoff?.source, EtaMainVisibility.visible)) {
+            removeAmbientWindows()
+        } else if (run.hasInteractionLease && run.revealAfterInteraction && !run.session.isTerminal) {
+            ensureOverlayVisible()
+        }
     }
 
     private fun setKeepScreenOn(enabled: Boolean) {
@@ -1078,6 +1108,12 @@ internal class AgentRuntimeService : Service(), LifecycleOwner, SavedStateRegist
     }
 
     private fun showOverlay() {
+        val run = activeSession?.let { runs.active(it.runId) }
+        if (AgentOverlayVisibilityPolicy.shouldSuppressOverlayInEtaUi(
+                run?.request?.handoff?.source, EtaMainVisibility.visible)) {
+            removeAmbientWindows()
+            return
+        }
         if (activeSession?.let { session ->
                 usesVirtualUi(session, runBlocking { SettingsDataStore.settings() }.virtualScreenEnabled)
             } == true) return
@@ -1435,7 +1471,7 @@ internal class AgentRuntimeService : Service(), LifecycleOwner, SavedStateRegist
                 (AgentAccessibilityService.current() != null || Settings.canDrawOverlays(this))) {
                 windowManager = overlayContext().getSystemService(Context.WINDOW_SERVICE) as? WindowManager
             }
-            // 撤掉胶囊和边缘光，改显半屏结果卡片，不自动关闭，用户手动关闭
+            // 撤掉胶囊和边缘光；结果卡片按上游规则在无交互时自动退场。
             capsuleExpanded.value = false
             removeAmbientWindows()
             windowManager?.let(::showResultCard)
@@ -1506,6 +1542,12 @@ internal class AgentRuntimeService : Service(), LifecycleOwner, SavedStateRegist
     }
 
     companion object {
+        @Volatile private var activeInstance: AgentRuntimeService? = null
+
+        internal fun onEtaUiVisibilityChanged() {
+            val instance = activeInstance ?: return
+            instance.mainHandler.post { instance.handleEtaUiVisibilityChanged() }
+        }
         // 只投影到 App 与 GUI 浮层的现有窗口，窗口不可见时由系统恢复息屏。
         private val keepScreenOnState = MutableStateFlow(false)
         val keepScreenOn = keepScreenOnState.asStateFlow()

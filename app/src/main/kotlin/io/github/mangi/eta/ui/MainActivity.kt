@@ -34,10 +34,12 @@ class MainActivity : ComponentActivity() {
     override fun onStart() {
         super.onStart()
         io.github.mangi.eta.agent.runtime.EtaMainVisibility.tracker.started(this)
+        io.github.mangi.eta.agent.runtime.AgentRuntimeService.onEtaUiVisibilityChanged()
     }
 
     override fun onStop() {
         io.github.mangi.eta.agent.runtime.EtaMainVisibility.tracker.stopped(this)
+        io.github.mangi.eta.agent.runtime.AgentRuntimeService.onEtaUiVisibilityChanged()
         super.onStop()
     }
 
@@ -151,6 +153,8 @@ class MainActivity : ComponentActivity() {
     }
 
     companion object {
+        internal val isInForeground: Boolean
+            get() = io.github.mangi.eta.agent.runtime.EtaMainVisibility.visible
         const val ACTION_VIEW_EXECUTION = "io.github.mangi.eta.action.VIEW_EXECUTION"
         const val EXTRA_EXECUTION_SOURCE = "io.github.mangi.eta.extra.EXECUTION_SOURCE"
         /** 运行浮层的结果卡片回到本体：App 发起的 run 带会话 ID，直接打开该会话。 */

@@ -55,6 +55,7 @@ internal object AgentModelClient {
                     thinkingEnabled = effort.enablesReasoning,
                     reasoningEffort = effort,
                     autoCompactionEnabled = Prefs.isEnabled(Prefs.Keys.AGENT_AUTO_COMPACTION_ENABLED),
+                    subagentTools = Prefs.isEnabled(Prefs.Keys.AGENT_SUBAGENT_ENABLED),
                 )
             }
         }
@@ -73,6 +74,7 @@ internal object AgentModelClient {
             modelDisplayName = "GPT-5.5",
             systemPrompt = BuiltinProviders.DEFAULT_SYSTEM_PROMPT,
             autoCompactionEnabled = Prefs.isEnabled(Prefs.Keys.AGENT_AUTO_COMPACTION_ENABLED),
+            subagentTools = Prefs.isEnabled(Prefs.Keys.AGENT_SUBAGENT_ENABLED),
             terminalTools = Prefs.isEnabled(Prefs.Keys.AGENT_TERMINAL_TOOLS),
             browserTools = Prefs.isEnabled(Prefs.Keys.AGENT_BROWSER_TOOLS),
             deviceDirectTools = Prefs.isEnabled(Prefs.Keys.AGENT_DEVICE_DIRECT_TOOLS),
@@ -108,6 +110,7 @@ internal object AgentModelClient {
         roleplayContext: RoleplayRunContext? = null,
         rewriteReply: Boolean = false,
         assistantScreenContext: String = "",
+        toolFilter: ((JSONArray) -> JSONArray)? = null,
         onContextSnapshot: (AgentContextSnapshot) -> Unit = {},
         onTranscript: (List<ConversationMessage>) -> Unit = {},
         restrictedToolNames: Set<String>? = null,
@@ -172,10 +175,12 @@ internal object AgentModelClient {
                     if (schema.optJSONObject("function")?.optString("name") in restrictedToolNames) filtered.put(schema)
                 }
             }
-            return AgentBatchToolCatalog.project(
-                filtered,
+            val scoped = toolFilter?.invoke(filtered) ?: filtered
+            val projected = AgentBatchToolCatalog.project(
+                scoped,
                 enabled = restrictedToolNames == null || AgentBatchToolCatalog.NAME in restrictedToolNames,
             )
+            return toolFilter?.invoke(projected) ?: projected
         }
         val tools = toolsFor(initialCapabilities)
         onEvent(
@@ -350,6 +355,7 @@ internal object AgentModelClient {
         val customHeaders: List<CustomHeader> = emptyList(),
         val customBody: List<CustomBody> = emptyList(),
         val autoCompactionEnabled: Boolean = Prefs.Keys.BOOLEAN_DEFAULTS.getValue(Prefs.Keys.AGENT_AUTO_COMPACTION_ENABLED),
+        val subagentTools: Boolean = Prefs.Keys.BOOLEAN_DEFAULTS.getValue(Prefs.Keys.AGENT_SUBAGENT_ENABLED),
         val authMode: String = ProviderAuthModes.API_KEY,
     ) {
         val usesHostedWebSearch: Boolean
@@ -391,7 +397,8 @@ internal object AgentModelClient {
     data class ToolCall(
         val id: String,
         val name: String,
-        val argumentsJson: String
+        val argumentsJson: String,
+        val round: Int = 1,
     )
 
     data class ToolResult(
@@ -406,6 +413,7 @@ internal object AgentModelClient {
         val stop: ToolStop? = null,
         /** Set only by the loop when a call was rejected before invoking its executor. */
         val executionSkipped: Boolean = false,
+        val command: String? = null,
     )
 
     data class ToolStop(val code: String, val message: String) {

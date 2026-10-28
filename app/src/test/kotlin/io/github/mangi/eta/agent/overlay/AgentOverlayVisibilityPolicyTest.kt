@@ -1,5 +1,6 @@
 package io.github.mangi.eta.agent.overlay
 
+import io.github.mangi.eta.agent.runtime.AgentRuntimeWire
 import io.github.mangi.eta.agent.runtime.AgentEvent
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -230,6 +231,56 @@ class AgentOverlayVisibilityPolicyTest {
                 started,
                 entrySurfaceReady = true,
             )
+        )
+    }
+    @Test
+    fun etaUiRunsSuppressOverlayAndResultCardOnlyWhileEtaIsInForeground() {
+        assertTrue(
+            AgentOverlayVisibilityPolicy.shouldSuppressOverlayInEtaUi(
+                handoffSource = AgentRuntimeWire.AGENT_UI_HANDOFF_SOURCE,
+                etaUiInForeground = true,
+            ),
+        )
+        assertFalse(
+            AgentOverlayVisibilityPolicy.shouldSuppressOverlayInEtaUi(
+                handoffSource = AgentRuntimeWire.AGENT_UI_HANDOFF_SOURCE,
+                etaUiInForeground = false,
+            ),
+        )
+        assertFalse(
+            AgentOverlayVisibilityPolicy.shouldSuppressOverlayInEtaUi(
+                handoffSource = "breeno",
+                etaUiInForeground = true,
+            ),
+        )
+
+        assertFalse(
+            AgentOverlayVisibilityPolicy.shouldShowResultCard(
+                hasExecutedForegroundTool = true,
+                handoffSource = AgentRuntimeWire.AGENT_UI_HANDOFF_SOURCE,
+                etaUiInForeground = true,
+            ),
+        )
+        assertTrue(
+            AgentOverlayVisibilityPolicy.shouldShowResultCard(
+                hasExecutedForegroundTool = true,
+                handoffSource = AgentRuntimeWire.AGENT_UI_HANDOFF_SOURCE,
+                etaUiInForeground = false,
+            ),
+        )
+        assertTrue(
+            AgentOverlayVisibilityPolicy.shouldShowResultCard(
+                hasExecutedForegroundTool = true,
+                handoffSource = "xiaoai",
+                etaUiInForeground = true,
+            ),
+        )
+        assertFalse(
+            AgentOverlayVisibilityPolicy.shouldShowResultCard(
+                hasExecutedForegroundTool = false,
+                handoffSource = "xiaoai",
+                etaUiInForeground = false,
+            ),
         )
     }
 }

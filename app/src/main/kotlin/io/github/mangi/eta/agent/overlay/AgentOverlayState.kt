@@ -94,6 +94,7 @@ private fun AgentOverlayState.projectEvent(event: AgentEvent): AgentOverlayState
     is AgentEvent.ProviderResponseStarted,
     is AgentEvent.UsageReceived,
     is AgentEvent.ToolImagesAttached,
+    is AgentEvent.SubagentProgress,
     -> this
 }
 

@@ -392,8 +392,8 @@ internal class AgentLoop(
             if (!traceFormatter.isSuccessResult(outcome.result)) failed = true
             onOutcome(outcome)
         }
-        val segments = if (parallel) AgentToolBatchPlanner.plan(toolCalls) else
-            listOf(AgentToolBatchPlanner.Segment(parallel = false, calls = toolCalls))
+        val segments = if (parallel) AgentToolBatchPlanner.plan(toolCalls.map { it.copy(round = round) }) else
+            listOf(AgentToolBatchPlanner.Segment(parallel = false, calls = toolCalls.map { it.copy(round = round) }))
         for (segment in segments) {
             // Bounded waves prevent queued work from starting beyond a pause/cancellation.
             for (wave in segment.calls.chunked(AgentToolBatchPlanner.MAX_CONCURRENT_CALLS)) {
@@ -650,6 +650,7 @@ internal class AgentLoop(
                 imageCount = result.images.size,
                 imageBytes = result.images.sumOf { it.bytes },
                 success = traceFormatter.isSuccessResult(result),
+                command = result.command,
             )
         )
     }

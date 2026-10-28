@@ -33,16 +33,25 @@ internal object AgentToolBatchPlanner {
     fun plan(calls: List<AgentModelClient.ToolCall>): List<Segment> {
         val segments = mutableListOf<Segment>()
         val parallelRun = mutableListOf<AgentModelClient.ToolCall>()
+        var parallelKind: String? = null
 
         fun flushParallel() {
             if (parallelRun.isNotEmpty()) {
                 segments += Segment(parallel = parallelRun.size > 1, calls = parallelRun.toList())
                 parallelRun.clear()
             }
+            parallelKind = null
         }
 
         calls.forEach { call ->
-            if (isParallelSafe(call)) {
+            val kind = when {
+                isParallelSafe(call) -> "read"
+                call.name == "subagent" && runCatching { JSONObject(call.argumentsJson) }.isSuccess -> "subagent"
+                else -> null
+            }
+            if (kind != null) {
+                if (parallelKind != kind) flushParallel()
+                parallelKind = kind
                 parallelRun += call
             } else {
                 flushParallel()

@@ -7,6 +7,18 @@ import org.junit.Test
 
 class AgentToolBatchPlannerTest {
     @Test
+    fun subagentWavesDoNotCrossReadsOrMutations() {
+        val calls = listOf(call("1", "subagent"), call("2", "subagent"),
+            call("3", "read_file"), call("4", "read_file"), call("5", "write_file"),
+            call("6", "subagent"), call("7", "subagent"))
+        val segments = AgentToolBatchPlanner.plan(calls)
+        assertEquals(listOf(listOf("1", "2"), listOf("3", "4"), listOf("5"), listOf("6", "7")),
+            segments.map { it.calls.map { call -> call.id } })
+        assertEquals(listOf(true, true, false, true), segments.map { it.parallel })
+        assertFalse("subagent" in AgentToolBatchPlanner.batchTools)
+    }
+
+    @Test
     fun readsNeverCrossMutationOrObservationBarriers() {
         val calls = listOf(
             call("1", "read_file"), call("2", "web_search"),

@@ -7,8 +7,8 @@ internal fun AgentEvent.replayProjection(): AgentEvent? = when (this) {
     else -> this
 }
 
-/** checkpoint 与归档均不能存储搜索建议 HTML。 */
+/** 搜索建议 HTML 和 Subagent 中间进度不写入 checkpoint 或归档。 */
 internal fun AgentEvent.recoveryProjection(): AgentEvent? = when (this) {
-    is AgentEvent.SearchSuggestions -> null
+    is AgentEvent.SearchSuggestions, is AgentEvent.SubagentProgress -> null
     else -> replayProjection()
 }
