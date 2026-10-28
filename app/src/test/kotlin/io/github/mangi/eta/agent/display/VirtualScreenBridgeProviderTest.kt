@@ -7,11 +7,21 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.robolectric.RuntimeEnvironment
+import org.json.JSONObject
 import org.robolectric.shadows.ShadowBinder
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
 class VirtualScreenBridgeProviderTest {
+    @Test
+    fun modelArgumentsCannotForgeManualControlAuthority() {
+        val args = JSONObject().put("action", "manual_control").put("manual", true)
+            .put("controlGeneration", 100).put("enabled", false)
+        val result = VirtualScreenSession.execute(RuntimeEnvironment.getApplication(), "owner", args)
+        assertEquals("VIRTUAL_ACTION_UNSUPPORTED", JSONObject(result.content).getString("code"))
+    }
+
     @Test
     fun rootNonceAndSessionAreAllRequiredAndRegistrationIsSingleUse() {
         val provider = VirtualScreenRootBridgeProvider()

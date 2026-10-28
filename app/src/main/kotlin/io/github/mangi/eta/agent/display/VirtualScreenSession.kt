@@ -303,11 +303,12 @@ internal object VirtualScreenSession {
     ): AgentModelClient.ToolResult = synchronized(lock) {
         try {
             check(!isCancelled()) { "DISPLAY_CANCELLED" }
+            val action = args.getString("action")
+            require(action != "manual_control" || manual) { "VIRTUAL_ACTION_UNSUPPORTED" }
             require(android.os.Build.VERSION.SDK_INT >= 34) { "DEVICE_UNSUPPORTED" }
             val settings = runBlocking { SettingsDataStore.settings() }
             require(settings.virtualScreenEnabled) { "VIRTUAL_SCREEN_DISABLED" }
             require(RootAccess.isGranted) { "ROOT_REQUIRED" }
-            val action = args.getString("action")
             if (action == "launch" && args.optBoolean("restartApp")) {
                 require(appRestartApproved || settings.virtualScreenAutoRestartApps) { "APP_RESTART_PERMISSION_REQUIRED" }
             }

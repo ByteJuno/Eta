@@ -149,6 +149,7 @@ internal object RootDisplayCommandMain {
                     }
                     require(displayManager.getDisplay(id) != null) { "DISPLAY_GONE" }
                     if (request.optString("action") == "manual_control") {
+                        require(request.optBoolean("manual")) { "VIRTUAL_ACTION_UNSUPPORTED" }
                         mirror.setManualControl(request.getLong("controlGeneration"), request.getBoolean("enabled"))
                         reply(JSONObject().put("ok", true))
                         continue
