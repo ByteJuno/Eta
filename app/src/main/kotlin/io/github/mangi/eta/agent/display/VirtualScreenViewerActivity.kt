@@ -277,6 +277,7 @@ internal class VirtualScreenViewerActivity : ComponentActivity() {
                                             it.onInput = ::sendInput
                                             it.onManualDown = { id -> VirtualScreenSession.manualGestureToken(id, viewerId) }
                                             it.onManualComplete = { id, token -> VirtualScreenSession.finishManualGesture(id, viewerId, token) }
+                                            it.onManualDispatched = { id, token, action -> VirtualScreenSession.recordManualGesture(id, viewerId, token, action) }
                                             it.onLiveChanged = { live ->
                                                 VirtualScreenSession.state.value.display?.sessionId?.let { id ->
                                                     VirtualScreenSession.setViewerLive(id, viewerId, live)

@@ -55,7 +55,7 @@ internal class VirtualScreenLiveChannel(val sessionId: String, private val remot
                 .put("gesture", gesture)
                 .put("controlGeneration", control),
         ) {
-            Unit
+            it.readString()
         }
 
     fun cancel(viewer: String, gesture: Long, control: Long) =

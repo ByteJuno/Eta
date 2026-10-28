@@ -18,6 +18,7 @@ class VirtualScreenRootMotionStreamTest {
     @Test
     fun returningControlCancelsTheActiveFingerBeforeUnblockingAgentInput() {
         val events = CopyOnWriteArrayList<Int>()
+        val dispatched = CopyOnWriteArrayList<Long>()
         val down = CountDownLatch(1)
         val injector =
             VirtualScreenInputInjector(
@@ -30,13 +31,20 @@ class VirtualScreenRootMotionStreamTest {
                 },
             )
         val stream =
-            VirtualScreenRootMotionStream(injector, { true }, {}, { _, error -> fail(error) })
+            VirtualScreenRootMotionStream(
+                injector,
+                { true },
+                {},
+                { _, error -> fail(error) },
+                { id, _ -> dispatched += id },
+            )
         try {
             stream.takeover()
             send(stream, 1, MotionEvent.ACTION_DOWN)
             assertTrue(down.await(2, TimeUnit.SECONDS))
             stream.resume()
             assertFalse(stream.isManualControl)
+            assertTrue(dispatched.isEmpty())
             assertEquals(
                 listOf(MotionEvent.ACTION_DOWN, MotionEvent.ACTION_CANCEL),
                 events.toList(),
@@ -50,6 +58,7 @@ class VirtualScreenRootMotionStreamTest {
     @Test
     fun cancellationOfOldGestureCannotCancelNextGesture() {
         val events = CopyOnWriteArrayList<Int>()
+        val dispatched = CopyOnWriteArrayList<Long>()
         val injector =
             VirtualScreenInputInjector(
                 3,
@@ -59,7 +68,13 @@ class VirtualScreenRootMotionStreamTest {
                 },
             )
         val stream =
-            VirtualScreenRootMotionStream(injector, { true }, {}, { _, error -> fail(error) })
+            VirtualScreenRootMotionStream(
+                injector,
+                { true },
+                {},
+                { _, error -> fail(error) },
+                { id, _ -> dispatched += id },
+            )
         try {
             stream.takeover()
             send(stream, 1, MotionEvent.ACTION_DOWN)
@@ -69,6 +84,7 @@ class VirtualScreenRootMotionStreamTest {
             stream.cancel(1)
             send(stream, 2, MotionEvent.ACTION_UP)
             stream.awaitSettled(2)
+            assertEquals(listOf(1L, 2L), dispatched.toList())
             assertEquals(
                 listOf(
                     MotionEvent.ACTION_DOWN,

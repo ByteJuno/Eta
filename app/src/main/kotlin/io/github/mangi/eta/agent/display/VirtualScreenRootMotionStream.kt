@@ -17,7 +17,7 @@ internal class VirtualScreenRootMotionStream(
     private val allowed: () -> Boolean,
     private val onActivity: () -> Unit,
     private val onFailure: (Long, String) -> Unit,
-    private val onDispatched: (String) -> Unit = {},
+    private val onDispatched: (Long, String) -> Unit = { _, _ -> },
 ) : AutoCloseable {
     private data class Pending(val gestureId: Long, val epoch: Long, val event: MotionEvent)
 
@@ -151,11 +151,12 @@ internal class VirtualScreenRootMotionStream(
                     moved = true
                 if (event.actionMasked == MotionEvent.ACTION_UP)
                     onDispatched(
+                        pending.gestureId,
                         when {
                             moved -> "swipe"
                             event.eventTime - event.downTime >= 500 -> "long_press"
                             else -> "tap"
-                        }
+                        },
                     )
                 lastEvent?.recycle()
                 lastEvent = if (state.active) MotionEvent.obtain(event) else null

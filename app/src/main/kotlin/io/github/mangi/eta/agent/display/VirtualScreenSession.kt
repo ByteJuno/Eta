@@ -188,6 +188,13 @@ internal object VirtualScreenSession {
         it.owner == owner && !it.closed.get() && it.process.isAlive
     } == true
 
+    fun recordManualGesture(sessionId: String, viewerId: String, token: String, action: String) {
+        val current = session.get()?.takeIf { it.id == sessionId && !it.closed.get() } ?: return
+        if (action !in setOf("tap", "long_press", "swipe") ||
+            !current.manualControl.accepts(viewerId, token.toLongOrNull() ?: return)) return
+        recordOperation(current.owner, null, action, true, manual = true)
+    }
+
     /** Idle displays may be replaced by another conversation; an executing run keeps exclusive ownership. */
     fun prepareForRun(owner: String, runId: String): Boolean = synchronized(lock) {
         val current = session.get() ?: return@synchronized true

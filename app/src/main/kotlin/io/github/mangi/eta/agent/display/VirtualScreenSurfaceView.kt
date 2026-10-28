@@ -74,6 +74,7 @@ internal class VirtualScreenSurfaceView(context: Context) :
     var onLiveChanged: (Boolean) -> Unit = {}
     var onManualDown: (String) -> String? = { null }
     var onManualComplete: (String, String) -> Unit = { _, _ -> }
+    var onManualDispatched: (String, String, String) -> Unit = { _, _, _ -> }
     private var phoneToken: String? = null
     var onInput: (String, JSONObject) -> Unit = { _, _ -> }
     var touchEnabled = true
@@ -335,7 +336,15 @@ internal class VirtualScreenSurfaceView(context: Context) :
                     try {
                         if (epoch.get() == generation) {
                             channel.motion(viewer, g, id, requireNotNull(token).toLong(), mapped)
-                            if (finished) channel.settle(viewer, id, requireNotNull(token).toLong())
+                            if (finished) {
+                                val action =
+                                    channel.settle(viewer, id, requireNotNull(token).toLong())
+                                if (
+                                    mapped.actionMasked == MotionEvent.ACTION_UP && action != null
+                                ) {
+                                    post { onManualDispatched(inputSession, token, action) }
+                                }
+                            }
                         }
                     } catch (e: Exception) {
                         runCatching { channel.cancel(viewer, id, requireNotNull(token).toLong()) }

@@ -22,12 +22,14 @@ internal class VirtualScreenDisplayMirror(
     private var parent: SurfaceControl? = null
     private var viewer: String? = null
     private val inputErrors = ConcurrentHashMap<Long, String>()
+    private val inputDispatches = ConcurrentHashMap<Long, String>()
     private val motion =
         VirtualScreenRootMotionStream(
             injector,
             allowed,
             onActivity,
             { id, error -> inputErrors[id] = error },
+            { id, action -> inputDispatches[id] = action },
         )
     private var controlGeneration = 0L
     val isManualControl: Boolean
@@ -164,8 +166,10 @@ internal class VirtualScreenDisplayMirror(
                         "STALE_OBSERVATION"
                     }
                     val gesture = request.getLong("gesture")
-                    if (event.actionMasked == MotionEvent.ACTION_DOWN)
+                    if (event.actionMasked == MotionEvent.ACTION_DOWN) {
                         inputErrors.keys.removeIf { it < gesture - 32 }
+                        inputDispatches.keys.removeIf { it < gesture - 32 }
+                    }
                     inputErrors[gesture]?.let { error(it) }
                     motion.enqueue(geometry, gesture, event)
                     reply?.writeNoException()
@@ -189,6 +193,7 @@ internal class VirtualScreenDisplayMirror(
                 motion.awaitSettled(gesture)
                 inputErrors.remove(gesture)?.let { error(it) }
                 reply?.writeNoException()
+                reply?.writeString(inputDispatches.remove(gesture))
             }
             VirtualScreenLiveChannel.CONTROL -> {
                 data.enforceNoDataAvail()
@@ -204,6 +209,7 @@ internal class VirtualScreenDisplayMirror(
     private fun closeMirror() {
         motion.cancel()
         inputErrors.clear()
+        inputDispatches.clear()
         layer?.let {
             runCatching {
                 SurfaceControl.Transaction().use { transaction ->
