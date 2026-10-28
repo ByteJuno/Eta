@@ -8,9 +8,11 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
 class VirtualScreenMotionEventsTest {
     @Test
     fun multiPointerSequenceRejectsMissingDownAndStaleTimes() {
@@ -42,12 +44,31 @@ class VirtualScreenMotionEventsTest {
         val mapped = source.toVirtualDisplay(viewport)
         try {
             assertEquals(2, mapped.pointerCount)
-            for (index in 0..1) {
-                assertEquals(source.getPointerId(index), mapped.getPointerId(index))
-                assertEquals(source.getY(index) / viewport.scale, mapped.getX(index), 0.01f)
-                assertEquals(800f - source.getX(index) / viewport.scale, mapped.getY(index), 0.01f)
-            }
+            assertEquals(0, mapped.getPointerId(0))
+            assertEquals(1, mapped.getPointerId(1))
+            assertEquals(200f, mapped.getX(0), 0.01f)
+            assertEquals(700f, mapped.getY(0), 0.01f)
+            assertEquals(280f, mapped.getX(1), 0.01f)
+            assertEquals(620f, mapped.getY(1), 0.01f)
             assertEquals(InputDevice.SOURCE_TOUCHSCREEN, mapped.source)
+        } finally {
+            mapped.recycle()
+            source.recycle()
+        }
+    }
+
+    @Test
+    fun pointerHistoryIsTransformedAndExcursionsStayInsideDisplay() {
+        val source = MotionEvent.obtain(100, 110, MotionEvent.ACTION_MOVE, 50f, 100f, 0)
+        source.addBatch(120, -10f, 900f, 1f, 1f, 0)
+        val viewport = requireNotNull(VirtualScreenViewport.fit(400, 800, 1600, 800))
+        val mapped = source.toVirtualDisplay(viewport)
+        try {
+            assertEquals(1, mapped.historySize)
+            assertEquals(200f, mapped.getHistoricalX(0), 0.01f)
+            assertEquals(700f, mapped.getHistoricalY(0), 0.01f)
+            assertEquals(1599.999f, mapped.x, 0.01f)
+            assertEquals(799.999f, mapped.y, 0.01f)
         } finally {
             mapped.recycle()
             source.recycle()
