@@ -22,6 +22,17 @@ import org.robolectric.annotation.GraphicsMode
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class VirtualScreenSurfaceViewTest {
     @Test
+    fun newGeometryWithoutNewPixelsCannotReceiveFallbackTouch() {
+        val inputs = mutableListOf<JSONObject>()
+        val view = view(inputs)
+        view.setLiveTarget(VirtualDisplayInfo("session", "run", 3, 1280, 720, rotation = 1), null)
+        touch(view, MotionEvent.ACTION_DOWN, 500f, 1000f, 1000)
+        touch(view, MotionEvent.ACTION_UP, 500f, 1000f, 1100)
+        assertTrue(inputs.isEmpty())
+        view.dispose()
+    }
+
+    @Test
     fun unacknowledgedTakeoverAndBackgroundViewerCannotInject() {
         val inputs = mutableListOf<JSONObject>()
         val view = view(inputs)

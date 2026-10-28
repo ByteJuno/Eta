@@ -74,6 +74,7 @@ internal object VirtualScreenSession {
         var stop: AgentModelClient.ToolStop? = null
         var pausedPackageName: String = ""
         var pausedManualGeneration: Long = -1L
+        val controlLock = Any()
         val manualControl = VirtualScreenManualControl()
         val nativeViewers = ConcurrentHashMap.newKeySet<String>()
         @Volatile var liveChannel: VirtualScreenLiveChannel? = null
@@ -81,7 +82,7 @@ internal object VirtualScreenSession {
             if (!closed.compareAndSet(false, true)) return
             liveChannel = null
             nativeViewers.clear()
-            manualControl.close()
+            synchronized(controlLock) { manualControl.close() }
             session.compareAndSet(this, null)
             viewerState.update {
                 if (it.display?.sessionId != id) it else it.copy(
@@ -107,8 +108,10 @@ internal object VirtualScreenSession {
     fun registerRunController(runId: String, controller: AgentRunController): AutoCloseable {
         runControllers[runId] = controller
         return AutoCloseable {
-            if (runControllers.remove(runId, controller) && viewerState.value.activeRunId == runId) {
-                session.get()?.manualControl?.bind(null)
+            if (runControllers.remove(runId, controller)) session.get()?.let { current ->
+                synchronized(current.controlLock) {
+                    if (viewerState.value.activeRunId == runId) current.manualControl.bind(null)
+                }
             }
         }
     }
@@ -119,8 +122,11 @@ internal object VirtualScreenSession {
     /** No Root IPC or display lock on the UI thread. The backend serializes transitions. */
     fun requestManualControl(context: Context, sessionId: String, viewerId: String, enabled: Boolean) {
         val current = session.get()?.takeIf { it.id == sessionId && !it.closed.get() } ?: return
-        current.manualControl.bind(viewerState.value.activeRunId?.let(runControllers::get))
-        val transition = current.manualControl.request(viewerId, enabled) ?: return
+        val transition = synchronized(current.controlLock) {
+            if (current.closed.get()) return
+            current.manualControl.bind(viewerState.value.activeRunId?.let(runControllers::get))
+            current.manualControl.request(viewerId, enabled)
+        } ?: return
         publishManualControl(current, invalidate = true)
         manualUpdates.execute {
             if (session.get() !== current || !current.manualControl.isCurrent(transition)) return@execute
@@ -197,8 +203,10 @@ internal object VirtualScreenSession {
                 current.stop = null
                 current.pausedPackageName = ""
                 current.pausedManualGeneration = -1L
-                viewerState.update { if (it.display?.sessionId == current.id) it.beginRun(runId) else it }
-                current.manualControl.bind(runControllers[runId])
+                synchronized(current.controlLock) {
+                    viewerState.update { if (it.display?.sessionId == current.id) it.beginRun(runId) else it }
+                    current.manualControl.bind(runControllers[runId])
+                }
                 updateIdleTimeout()
             }
             return@synchronized acquired
@@ -213,8 +221,11 @@ internal object VirtualScreenSession {
         // Cancellation may arrive while a root input is awaiting acknowledgement under lock.
         // Releasing a run must not wait for that input or destroy its independent display process.
         val current = session.get()?.takeIf { it.owner == owner } ?: return
-        if (!current.runLease.release(runId, retain)) return
-        viewerState.update { if (it.display?.sessionId == current.id) it.finishRun(runId, completed, cancelled, paused) else it }
+        synchronized(current.controlLock) {
+            if (!current.runLease.release(runId, retain)) return
+            viewerState.update { if (it.display?.sessionId == current.id) it.finishRun(runId, completed, cancelled, paused) else it }
+            current.manualControl.bind(null)
+        }
         if (!retain) current.close() else previewUpdates.execute {
             synchronized(lock) {
                 if (session.get() === current && !current.closed.get() && viewerState.value.activeRunId == null) {

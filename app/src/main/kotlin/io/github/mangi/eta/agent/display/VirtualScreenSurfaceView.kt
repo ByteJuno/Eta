@@ -120,16 +120,14 @@ internal class VirtualScreenSurfaceView(context: Context) :
     }
 
     fun setLiveTarget(display: VirtualDisplayInfo?, channel: VirtualScreenLiveChannel?) {
-        if (sessionId != display?.sessionId) {
+        val nextGeometry =
+            display?.let { VirtualScreenLiveGeometry(it.width, it.height, it.rotation) }
+        if (sessionId != display?.sessionId || nextGeometry != null && geometry != nextGeometry) {
             bitmap?.recycle()
             bitmap = null
         }
         displayInfo = display
-        setTarget(
-            display?.sessionId,
-            channel,
-            display?.let { VirtualScreenLiveGeometry(it.width, it.height, it.rotation) } ?: geometry,
-        )
+        setTarget(display?.sessionId, channel, nextGeometry ?: geometry)
     }
 
     fun setFrame(next: Bitmap, display: VirtualDisplayInfo) {
