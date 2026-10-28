@@ -403,6 +403,9 @@ internal object VirtualScreenSession {
             require(owner == current.owner) { "DISPLAY_OWNER_MISMATCH" }
             require(!current.closed.get() && current.process.isAlive) { "DISPLAY_GONE" }
             require(!current.allowOff || settings.virtualScreenOffEnabled) { "SCREEN_OFF_PERMISSION_REQUIRED" }
+            if (!manual && current.manualControl.isBlocking && action in setOf("restart", "close")) {
+                return@synchronized failure("UI_MANUAL_CONTROL")
+            }
             if (!manual && action in MUTATING_ACTIONS) {
                 checkUiAction(context, owner, args)?.let { return@synchronized it }
             }
