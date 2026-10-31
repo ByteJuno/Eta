@@ -396,3 +396,7 @@ App 恢复时以 `checkpoint + outbox + active session` 统一对账，不再用
 ```bash
 ./gradlew :app:assembleDebug :app:testDebugUnitTest :app:lintDebug
 ```
+
+## 后台虚拟屏与多会话
+
+3.4.0-vscreen.1 使用上游 VirtualDisplayController、activeDisplayId 路由、present_to_user 和胶囊预览/接管。物理主屏动作须按轮审批，会话明确选择主屏时免询问；只读观察与移交用户不申请授权。主屏、唯一虚拟屏和浏览器继续共用 fork 整轮交互租约，不采用上游 GuiControlCoordinator/release_gui。详细规则见 [虚拟屏](VIRTUAL_SCREEN.md) 与 [多会话](MULTI_SESSION.md)。

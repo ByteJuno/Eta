@@ -240,29 +240,6 @@ class AgentBatchToolTest {
     }
 
     @Test
-    fun sequentialGuiPauseSkipsRemainingMutationAndRecoversOnceEvenWithContinue() {
-        val provider = ScriptedProvider(wrapper(listOf(
-            write("first"), item("tap", JSONObject().put("x", 1).put("y", 1).put("coordinate_space", "screen")), write("skipped"),
-        ), "sequential", "continue"))
-        val executed = mutableListOf<String>()
-        val recoveries = AtomicInteger()
-        AgentModelClient.complete(config().copy(terminalTools = true), "执行", AgentModelClient.ToolExecutor { call ->
-            executed += call.name
-            if (call.name == "tap") AgentModelClient.ToolResult("{\"ok\":false}",
-                stop = AgentModelClient.ToolStop("UI_NO_PROGRESS", "暂停"))
-            else AgentModelClient.ToolResult("{\"ok\":true}")
-        }, provider = provider, recoverVirtualUi = {
-            recoveries.incrementAndGet()
-            AgentModelClient.ToolResult("{\"ok\":true}")
-        })
-        assertEquals(listOf("write_file", "tap", "observe_screen"), executed)
-        assertEquals(1, recoveries.get())
-        val aggregate = provider.requests.last().messages.objects().single { it.optString("tool_call_id") == "batch-call" }
-            .getString("content").let(::JSONObject)
-        assertEquals("UI_EXECUTION_PAUSED", aggregate.getJSONArray("results").getJSONObject(2).getJSONObject("result").getString("code"))
-    }
-
-    @Test
     fun autoStopOnErrorRunsReadsSequentiallyAndRejectsEnabledMutationsBeforeExecution() {
         val provider = ScriptedProvider(wrapper(listOf(query("fail"), query("skipped")), onError = "stop"))
         val executed = mutableListOf<String>()

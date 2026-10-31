@@ -136,7 +136,7 @@ internal object AgentExperienceReview {
                     rootAvailable = { false },
                     learningProposalWriter = { tool, args -> runBlocking {
                         io.github.mangi.eta.data.repository.LearningProposalRepository(appContext).stage(
-                            tool, args, request.virtualScreenOwner, request.runId, automatic = true,
+                            tool, args, request.conversationOwner, request.runId, automatic = true,
                             isCancelled = { controller.isCancelled })
                     } },
                 ).use { local ->
@@ -233,7 +233,7 @@ internal object ExperienceReviewPolicy {
         "open_app",
         "launch_app",
         "wait_for_text",
-        "wait_for_package", "virtual_screen"
+        "wait_for_package", "present_to_user"
     )
 
     fun hasSkillSignal(prompt: String, events: List<AgentEvent>): Boolean {

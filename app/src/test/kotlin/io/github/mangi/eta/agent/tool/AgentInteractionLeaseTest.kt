@@ -1,6 +1,6 @@
 package io.github.mangi.eta.agent.tool
 
-import io.github.mangi.eta.agent.display.VirtualScreenRoutingPolicy
+import io.github.mangi.eta.agent.virtualdisplay.MainScreenApprovalPolicy
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.Future
@@ -191,7 +191,7 @@ class AgentInteractionLeaseTest {
 
     @Test
     fun onlySharedInteractionToolsNeedTheLease() {
-        (VirtualScreenRoutingPolicy.uiTools + setOf("virtual_screen", "get_current_context", "app_state_control"))
+        (MainScreenApprovalPolicy.sharedInteractionTools + setOf( "get_current_context", "app_state_control"))
             .forEach { assertTrue(it, AgentInteractionLeaseCoordinator.requiresLease(it)) }
         listOf("web_search", "fetch_url", "search_apps", "terminal", "terminal_job", "read_file", "skills_read", "memory_get")
             .forEach { assertFalse(it, AgentInteractionLeaseCoordinator.requiresLease(it)) }

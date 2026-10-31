@@ -15,8 +15,6 @@ import androidx.compose.runtime.setValue
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.lifecycleScope
 import io.github.mangi.eta.agent.voice.EtaAssistantOverlayService
-import io.github.mangi.eta.agent.display.VirtualScreenSession
-import io.github.mangi.eta.agent.display.VirtualScreenViewerActivity
 import io.github.mangi.eta.agent.runtime.AgentRuntimeWire
 import io.github.mangi.eta.core.AndroidAgentLogger
 import io.github.mangi.eta.data.model.AppearanceThemeMode
@@ -108,7 +106,7 @@ class MainActivity : ComponentActivity() {
                             }
                         },
                     )
-                    io.github.mangi.eta.agent.display.VirtualScreenAppConflictDialog()
+                    io.github.mangi.eta.agent.virtualdisplay.MainScreenFallbackDialog()
                 }
             }
             contentReady = true
@@ -125,9 +123,6 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun openExecutionViewer(intent: Intent?) {
-        if (intent?.action == ACTION_VIEW_EXECUTION && VirtualScreenSession.isActive()) {
-            startActivity(Intent(this, VirtualScreenViewerActivity::class.java))
-        }
     }
 
     override fun onDestroy() {

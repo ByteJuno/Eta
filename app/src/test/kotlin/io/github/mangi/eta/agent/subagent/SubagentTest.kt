@@ -34,11 +34,11 @@ class SubagentTest {
     fun wildcardAndExplicitProfilesCannotControlTheForkVirtualDisplay() {
         for (profile in listOf(
             SubagentProfile.resolve("custom-wildcard", catalog = emptyList()),
-            SubagentProfile.resolve("custom-explicit", catalog = emptyList(), customTools = listOf("virtual_screen", "read_file")),
+            SubagentProfile.resolve("custom-explicit", catalog = emptyList(), customTools = listOf("present_to_user", "read_file")),
         )) {
-            assertFalse(profile.isToolAllowed("virtual_screen"))
+            assertFalse(profile.isToolAllowed("present_to_user"))
             val tools = JSONArray().put(JSONObject().put("type", "function").put("function",
-                JSONObject().put("name", "virtual_screen")))
+                JSONObject().put("name", "present_to_user")))
             assertEquals(0, profile.filterTools(tools).length())
             assertTrue(profile.isToolAllowed("read_file"))
         }

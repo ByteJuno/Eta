@@ -1,6 +1,6 @@
 package io.github.mangi.eta.agent.tool
 
-import io.github.mangi.eta.agent.display.VirtualScreenRoutingPolicy
+import io.github.mangi.eta.agent.virtualdisplay.MainScreenApprovalPolicy
 
 /**
  * Screen coordinates and the shared WebView remain valid between a run's tool calls.
@@ -97,12 +97,12 @@ internal class AgentInteractionLeaseCoordinator {
         private const val WAIT_CHECK_MS = 100L
 
         private val additionalSharedTools = setOf(
-            "virtual_screen", "get_current_context", "app_state_control",
+            "get_current_context", "app_state_control",
             "set_device_state", "set_setting", "set_brightness",
             "set_screen_timeout",
         )
 
         fun requiresLease(toolName: String): Boolean =
-            toolName in VirtualScreenRoutingPolicy.uiTools || toolName in additionalSharedTools
+            toolName in MainScreenApprovalPolicy.sharedInteractionTools || toolName in additionalSharedTools
     }
 }

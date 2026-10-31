@@ -39,9 +39,7 @@ import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import io.github.mangi.eta.EtaApp
 import io.github.mangi.eta.agent.accessibility.AgentAccessibilityService
 import io.github.mangi.eta.agent.device.RootAccess
-import io.github.mangi.eta.agent.display.ConversationDisplayRoute
-import io.github.mangi.eta.agent.display.VirtualScreenRoutingPolicy
-import io.github.mangi.eta.agent.display.VirtualScreenSession
+import io.github.mangi.eta.agent.virtualdisplay.ConversationDisplayRoute
 import io.github.mangi.eta.agent.media.AgentImageCodec
 import io.github.mangi.eta.agent.model.AgentModelClient
 import io.github.mangi.eta.agent.overlay.AgentHapticFeedback
@@ -55,16 +53,22 @@ import io.github.mangi.eta.agent.overlay.AgentOverlayState
 import io.github.mangi.eta.agent.overlay.AgentOverlayStatus
 import io.github.mangi.eta.agent.overlay.AgentOverlayVisibilityPolicy
 import io.github.mangi.eta.agent.overlay.applyEvent
+import io.github.mangi.eta.agent.virtualdisplay.VirtualDisplayController
+import io.github.mangi.eta.agent.virtualdisplay.VirtualDisplaySnapshot
 import io.github.mangi.eta.config.Prefs
 import io.github.mangi.eta.core.AndroidAgentLogger
 import io.github.mangi.eta.core.ModuleConfig
 import io.github.mangi.eta.core.safeLogType
 import io.github.mangi.eta.data.repository.RuntimeConfigRepository
-import io.github.mangi.eta.data.datastore.SettingsDataStore
 import kotlin.concurrent.thread
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.squircle.LocalSquircleEnabled
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.theme.darkColorScheme
@@ -86,6 +90,8 @@ internal class AgentRuntimeService : Service(), LifecycleOwner, SavedStateRegist
 
     private val mainHandler = Handler(Looper.getMainLooper())
     private val resultIo = Executors.newSingleThreadExecutor { runnable -> Thread(runnable, "agent-result-io") }
+    private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private val virtualDisplayState = mutableStateOf(VirtualDisplaySnapshot.Inactive)
     private val serviceMessenger = Messenger(IncomingHandler())
 
     @Volatile
@@ -147,6 +153,7 @@ internal class AgentRuntimeService : Service(), LifecycleOwner, SavedStateRegist
             }
     }
     private val capsuleExpanded = mutableStateOf(false)
+    private val capsuleSupplementFocusable = mutableStateOf(false)
     /** Agent 手势穿过胶囊时为 true：窗口不可触摸，胶囊淡出让路。 */
     private val capsuleYielded = mutableStateOf(false)
     private val restoreCapsule = Runnable { setCapsuleYielded(false) }
@@ -191,6 +198,20 @@ internal class AgentRuntimeService : Service(), LifecycleOwner, SavedStateRegist
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_START)
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_RESUME)
         AgentOverlayClearance.attach(clearanceHost)
+        serviceScope.launch {
+            VirtualDisplayController.snapshots.collect { snapshot ->
+                val wasActive = virtualDisplayState.value.active
+                virtualDisplayState.value = snapshot
+                activeSession?.let { session ->
+                    if (runs.active(session.runId)?.hasInteractionLease == true) session.virtualUiRouted.set(snapshot.active)
+                }
+                if (wasActive != snapshot.active) {
+                    if (!snapshot.active) VirtualDisplayController.setStageExpanded(false)
+                    updateCapsuleWindowBounds()
+                    handleEtaUiVisibilityChanged()
+                }
+            }
+        }
     }
 
     override fun onBind(intent: Intent): IBinder? {
@@ -215,6 +236,7 @@ internal class AgentRuntimeService : Service(), LifecycleOwner, SavedStateRegist
     }
 
     override fun onDestroy() {
+        serviceScope.cancel()
         destroyed = true
         if (activeInstance === this) activeInstance = null
         // 经验复盘由自己的执行引用持有；文字任务关闭入口服务后仍可完成。
@@ -240,6 +262,7 @@ internal class AgentRuntimeService : Service(), LifecycleOwner, SavedStateRegist
         resultIo.shutdown()
         mainHandler.removeCallbacksAndMessages(null)
         AgentOverlayClearance.detach(clearanceHost)
+        VirtualDisplayController.release(this)
         unregisterResultCardBack()
         resultCardView?.let { view -> runCatching { windowManager?.removeView(view) } }
         capsuleView?.let { view -> runCatching { windowManager?.removeView(view) } }
@@ -456,12 +479,6 @@ internal class AgentRuntimeService : Service(), LifecycleOwner, SavedStateRegist
             operation = request.operation,
             eventSink = { event ->
                 val current = runs.active(request.runId)?.session
-                if (current != null && !current.primaryDisplay.get() && event is AgentEvent.ToolStarted &&
-                    (event.name in VirtualScreenRoutingPolicy.uiTools || event.name == "virtual_screen") &&
-                    runBlocking { SettingsDataStore.settings() }.virtualScreenEnabled
-                ) {
-                    current.virtualUiRouted.set(true)
-                }
                 val virtualScreen = current?.let { usesVirtualUi(it) } == true
                 subscribers.forEach { sendEventTo(it, event, virtualScreen) }
             },
@@ -474,7 +491,7 @@ internal class AgentRuntimeService : Service(), LifecycleOwner, SavedStateRegist
             ?.let { AgentUiHandoffPayload.from(it.payload).conversationId })
         session.primaryDisplay.set(primaryDisplay)
         session.mainScreenFallbackApproved.set(primaryDisplay)
-        session.virtualUiRouted.set(!primaryDisplay && VirtualScreenSession.isOwnedBy(request.virtualScreenOwner))
+        session.virtualUiRouted.set(false)
         // Root 入口保留原有绑定服务生命周期；新增 FGS 不能成为厂商后台入口的新前置权限。
         val allowBoundFallback = RootAccess.isGranted || automated
         val executionHeld = AgentExecutionService.acquire(
@@ -557,7 +574,7 @@ internal class AgentRuntimeService : Service(), LifecycleOwner, SavedStateRegist
                     ?.takeIf(String::isNotBlank)
                     ?.let { key -> handoff.source to key }
             }
-        if (run.hasExecutedForegroundTool && !usesVirtualUi(run.session)) {
+        if (run.hasInteractionLease && run.revealAfterInteraction) {
             ensureOverlayVisible()
         }
     }
@@ -616,7 +633,7 @@ internal class AgentRuntimeService : Service(), LifecycleOwner, SavedStateRegist
             if (!usesVirtualUi(session)) run.hasExecutedForegroundTool = run.foregroundToolStarted
             if (activeSession !== session) selectRun(run)
             hasExecutedForegroundTool = run.hasExecutedForegroundTool
-            if (run.revealAfterInteraction && !usesVirtualUi(session)) ensureOverlayVisible()
+            if (run.revealAfterInteraction) ensureOverlayVisible()
         }
     }
 
@@ -628,10 +645,8 @@ internal class AgentRuntimeService : Service(), LifecycleOwner, SavedStateRegist
         val run = runs.active(session.runId)?.takeIf { it.session === session } ?: return
         val revealsOperation = AgentOverlayVisibilityPolicy.shouldRevealFor(event)
         val dismissesEntrySurface = AgentOverlayVisibilityPolicy.shouldDismissEntrySurfaceFor(event)
-        val virtualScreenEnabled = (revealsOperation || dismissesEntrySurface || event is AgentEvent.ToolStarted) &&
-            runBlocking { SettingsDataStore.settings() }.virtualScreenEnabled
-        val virtualUi = usesVirtualUi(session, virtualScreenEnabled)
-        val revealsForegroundOperation = !virtualUi && revealsOperation
+        val virtualUi = usesVirtualUi(session)
+        val revealsForegroundOperation = revealsOperation
         mainHandler.post {
             if (runs.active(session.runId) !== run) return@post
             // Planning and ToolStarted events precede tool admission. They must not dismiss
@@ -654,7 +669,6 @@ internal class AgentRuntimeService : Service(), LifecycleOwner, SavedStateRegist
                 run.overlayState = run.overlayState.applyEvent(event)
                 if (activeSession !== session) return@runCatching
                 hasExecutedForegroundTool = run.hasExecutedForegroundTool
-                if (usesVirtualUi(session, virtualScreenEnabled)) removeOverlayWindows()
                 state.value = run.overlayState
                 if (run.hasInteractionLease && revealsForegroundOperation && entrySurfaceReady) {
                     if (capsuleView == null) {
@@ -1061,8 +1075,9 @@ internal class AgentRuntimeService : Service(), LifecycleOwner, SavedStateRegist
         showOverlay()
     }
 
-    private fun usesVirtualUi(session: AgentRuntimeSession, virtualScreenEnabled: Boolean = false): Boolean =
-        (session.virtualUiRouted.get() || virtualScreenEnabled) && !session.mainScreenFallbackApproved.get()
+    private fun usesVirtualUi(session: AgentRuntimeSession): Boolean =
+        !session.primaryDisplay.get() && virtualDisplayState.value.active &&
+            runs.active(session.runId)?.hasInteractionLease == true
 
     private fun updateKeepScreenOn() {
         setKeepScreenOn(
@@ -1095,7 +1110,7 @@ internal class AgentRuntimeService : Service(), LifecycleOwner, SavedStateRegist
         }
         val run = activeSession?.let { runs.active(it.runId) } ?: return
         if (AgentOverlayVisibilityPolicy.shouldSuppressOverlayInEtaUi(
-                run.request.handoff?.source, EtaMainVisibility.visible)) {
+                run.request.handoff?.source, EtaMainVisibility.visible, virtualDisplayActive = virtualDisplayState.value.active)) {
             removeAmbientWindows()
         } else if (run.hasInteractionLease && run.revealAfterInteraction && !run.session.isTerminal) {
             ensureOverlayVisible()
@@ -1110,22 +1125,23 @@ internal class AgentRuntimeService : Service(), LifecycleOwner, SavedStateRegist
     private fun showOverlay() {
         val run = activeSession?.let { runs.active(it.runId) }
         if (AgentOverlayVisibilityPolicy.shouldSuppressOverlayInEtaUi(
-                run?.request?.handoff?.source, EtaMainVisibility.visible)) {
+                run?.request?.handoff?.source, EtaMainVisibility.visible, virtualDisplayActive = virtualDisplayState.value.active)) {
             removeAmbientWindows()
             return
         }
-        if (activeSession?.let { session ->
-                usesVirtualUi(session, runBlocking { SettingsDataStore.settings() }.virtualScreenEnabled)
-            } == true) return
         if (capsuleView != null) return
         // TYPE_ACCESSIBILITY_OVERLAY 免 SYSTEM_ALERT_WINDOW 权限；仅回退态（无障碍未启用）才需检查
         if (AgentAccessibilityService.current() == null && !Settings.canDrawOverlays(this)) return
         val wm = overlayContext().getSystemService(Context.WINDOW_SERVICE) as? WindowManager ?: return
         windowManager = wm
 
-        // ── 氛围光窗口：全屏触摸穿透，彩虹光圈，截图时被 takeScreenshotOfWindow 过滤 ─
+        // ── 氛围光窗口：全屏触摸穿透，彩虹光圈（后台虚拟屏运行时隐藏流光，仅承载全屏破壁动画） ─
         val glow = createOverlayComposeView {
-            AgentOverlayGlow(state = state.value, corners = screenCornerRadii())
+            AgentOverlayGlow(
+                state = state.value,
+                corners = screenCornerRadii(),
+                virtualDisplay = virtualDisplayState.value,
+            )
         }
         val glowLp = glowLayoutParams()
         runCatching { wm.addView(glow, glowLp) }.onFailure { throwable ->
@@ -1136,7 +1152,7 @@ internal class AgentRuntimeService : Service(), LifecycleOwner, SavedStateRegist
         glowView = glow
         glowParams = glowLp
 
-        // ── 状态胶囊窗口：状态栏下方居中，收起时一句状态，点击展开控制 ─────
+        // ── 状态胶囊窗口：状态栏下方居中，收起时一句状态（含微缩镜），点击展开控制与画廊视窗 ─
         val capsule = createOverlayComposeView {
             AgentOverlayCapsule(
                 state = state.value,
@@ -1144,15 +1160,37 @@ internal class AgentRuntimeService : Service(), LifecycleOwner, SavedStateRegist
                 yielded = capsuleYielded.value,
                 onToggleExpanded = ::toggleCapsule,
                 onCollapsedSettled = ::onCapsuleCollapsedSettled,
-                onPause = ::requestPause,
-                onResume = ::requestResume,
-                onStop = ::requestStop,
+                onPause = {
+                    VirtualDisplayController.setUserControlling(false)
+                    requestPause()
+                },
+                onResume = {
+                    VirtualDisplayController.setUserControlling(false)
+                    requestResume()
+                },
+                onStop = { requestStop() },
                 onSupplementModeChange = ::setCapsuleInputMode,
                 onSupplement = { requestSupplement(it) },
+                virtualDisplay = virtualDisplayState.value,
+                onTakeOverVirtualDisplay = {
+                    VirtualDisplayController.setUserControlling(true)
+                    requestPause()
+                },
+                onResumeVirtualDisplay = {
+                    VirtualDisplayController.setUserControlling(false)
+                    requestResume()
+                },
+                onFullscreenVirtualDisplay = ::requestFullscreenVirtualDisplay,
+                onTapVirtualCanvas = { nx, ny, longPress ->
+                    VirtualDisplayController.dispatchUserTapOnCanvas(nx, ny, longPress)
+                },
+                onSwipeVirtualCanvas = { sx, sy, ex, ey, durationMs ->
+                    VirtualDisplayController.dispatchUserSwipeOnCanvas(sx, sy, ex, ey, durationMs)
+                },
             )
         }
         val capsuleLp = capsuleLayoutParams()
-        capsule.keepScreenOn = keepScreenOn.value
+        capsule.keepScreenOn = keepScreenOnState.value
         runCatching { wm.addView(capsule, capsuleLp) }.onFailure { throwable ->
             AndroidAgentLogger.warnThrottled("runtime_capsule_add_view_failed") {
                 "Agent runtime capsule addView failed: type=${throwable.safeLogType()}"
@@ -1189,26 +1227,59 @@ internal class AgentRuntimeService : Service(), LifecycleOwner, SavedStateRegist
 
     private fun toggleCapsule() {
         val expand = !capsuleExpanded.value
+        VirtualDisplayController.setStageExpanded(expand && virtualDisplayState.value.active)
         // 先把窗口扩到展开档再开始动画；收起由胶囊在动画结束后回调 onCollapsedSettled 缩窗。
-        if (expand) setCapsuleWindowHeight(CAPSULE_CONTROLS_HEIGHT_DP)
+        if (expand) updateCapsuleWindowBounds(expanding = true)
         capsuleExpanded.value = expand
     }
 
     private fun onCapsuleCollapsedSettled() {
-        if (!capsuleExpanded.value) setCapsuleWindowHeight(CAPSULE_COLLAPSED_HEIGHT_DP)
+        if (!capsuleExpanded.value) {
+            VirtualDisplayController.setStageExpanded(false)
+            updateCapsuleWindowBounds(expanding = false)
+        }
     }
 
-    private fun setCapsuleWindowHeight(heightDp: Int) {
+    private fun updateCapsuleWindowBounds(expanding: Boolean = capsuleExpanded.value) {
+        val vdActive = virtualDisplayState.value.active
+        val focusable = capsuleSupplementFocusable.value
+        val widthDp = if (vdActive && expanding && !focusable) {
+            CAPSULE_STAGE_WINDOW_WIDTH_DP
+        } else if (vdActive) {
+            CAPSULE_MICRO_WINDOW_WIDTH_DP
+        } else {
+            CAPSULE_WINDOW_WIDTH_DP
+        }
+        val heightDp = when {
+            focusable -> CAPSULE_SUPPLEMENT_HEIGHT_DP
+            expanding && vdActive -> CAPSULE_STAGE_HEIGHT_DP
+            expanding -> CAPSULE_CONTROLS_HEIGHT_DP
+            else -> CAPSULE_COLLAPSED_HEIGHT_DP
+        }
+        setCapsuleWindowSize(widthDp, heightDp)
+    }
+
+    private fun setCapsuleWindowSize(widthDp: Int, heightDp: Int) {
         val wm = windowManager ?: return
         val capsule = capsuleView ?: return
         val lp = capsuleParams ?: return
+        val width = dpToPx(widthDp)
         val height = dpToPx(heightDp)
-        if (lp.height == height) return
+        if (lp.width == width && lp.height == height) return
+        lp.width = width
         lp.height = height
         runCatching { wm.updateViewLayout(capsule, lp) }.onFailure { throwable ->
             AndroidAgentLogger.warnThrottled("runtime_capsule_resize_failed") {
                 "Agent runtime capsule resize failed: type=${throwable.safeLogType()}"
             }
+        }
+    }
+
+    private fun requestFullscreenVirtualDisplay() {
+        capsuleExpanded.value = false
+        VirtualDisplayController.setStageExpanded(false)
+        thread(name = "eta-vd-fullscreen-handoff", isDaemon = true) {
+            VirtualDisplayController.handoffToMainDisplay(this@AgentRuntimeService)
         }
     }
 
@@ -1219,6 +1290,14 @@ internal class AgentRuntimeService : Service(), LifecycleOwner, SavedStateRegist
                 state = state.value,
                 onClose = ::dismissAndStop,
                 onOpenEta = ::openEtaFromResult,
+                hasVirtualDisplayApp = virtualDisplayState.value.active &&
+                    virtualDisplayState.value.packageName.isNotBlank(),
+                onOpenVirtualApp = {
+                    thread(name = "eta-vd-result-handoff", isDaemon = true) {
+                        VirtualDisplayController.handoffToMainDisplay(this@AgentRuntimeService)
+                        mainHandler.post { dismissAndStop() }
+                    }
+                },
             )
         }
         val lp = resultCardLayoutParams()
@@ -1323,7 +1402,7 @@ internal class AgentRuntimeService : Service(), LifecycleOwner, SavedStateRegist
      */
     private fun capsuleLayoutParams(): WindowManager.LayoutParams =
         WindowManager.LayoutParams(
-            dpToPx(CAPSULE_WINDOW_WIDTH_DP),
+            dpToPx(if (virtualDisplayState.value.active) CAPSULE_MICRO_WINDOW_WIDTH_DP else CAPSULE_WINDOW_WIDTH_DP),
             dpToPx(CAPSULE_COLLAPSED_HEIGHT_DP),
             overlayType(),
             WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED or
@@ -1427,11 +1506,8 @@ internal class AgentRuntimeService : Service(), LifecycleOwner, SavedStateRegist
     }
 
     private fun setCapsuleInputMode(focusable: Boolean) {
-        setCapsuleWindowHeight(
-            if (focusable) CAPSULE_SUPPLEMENT_HEIGHT_DP
-            else if (capsuleExpanded.value) CAPSULE_CONTROLS_HEIGHT_DP
-            else CAPSULE_COLLAPSED_HEIGHT_DP,
-        )
+        capsuleSupplementFocusable.value = focusable
+        updateCapsuleWindowBounds()
         val wm = windowManager ?: return
         val capsule = capsuleView ?: return
         val lp = capsuleParams ?: return
@@ -1465,8 +1541,7 @@ internal class AgentRuntimeService : Service(), LifecycleOwner, SavedStateRegist
             return
         }
         if (hasExecutedForegroundTool || keepVisible) {
-            // Virtual runs never create the ambient overlay. Resolve a manager here at
-            // terminal state instead of calling showOverlay(), which would flash the capsule.
+            // 未显示过胶囊时直接取得结果窗口宿主，避免终态短暂闪出运行胶囊。
             if (windowManager == null &&
                 (AgentAccessibilityService.current() != null || Settings.canDrawOverlays(this))) {
                 windowManager = overlayContext().getSystemService(Context.WINDOW_SERVICE) as? WindowManager
@@ -1505,7 +1580,10 @@ internal class AgentRuntimeService : Service(), LifecycleOwner, SavedStateRegist
         // A bound service may remain alive after stopSelf; release completed conversation context.
         lastCompletedRunContext = null
         removeOverlayWindows()
-        if (runs.isEmpty()) stopSelf()
+        if (runs.isEmpty()) {
+            VirtualDisplayController.release(this)
+            stopSelf()
+        }
     }
 
     private fun isMessageSenderAllowed(msg: Message): Boolean {
@@ -1558,8 +1636,11 @@ internal class AgentRuntimeService : Service(), LifecycleOwner, SavedStateRegist
         private const val RESULT_CARD_HEIGHT_RATIO = 0.5f
         private const val RESULT_OPEN_REQUEST_CODE = 1108
         private const val CAPSULE_WINDOW_WIDTH_DP = 272
+        private const val CAPSULE_MICRO_WINDOW_WIDTH_DP = 290
+        private const val CAPSULE_STAGE_WINDOW_WIDTH_DP = 324
         private const val CAPSULE_COLLAPSED_HEIGHT_DP = 68
         private const val CAPSULE_CONTROLS_HEIGHT_DP = 124
+        private const val CAPSULE_STAGE_HEIGHT_DP = 524
         private const val CAPSULE_SUPPLEMENT_HEIGHT_DP = 260
         /** 注入点击只是一个点，目标控件常贴着胶囊边缘，判定范围向外多留一点。 */
         private const val CAPSULE_CLEARANCE_SLOP_DP = 8

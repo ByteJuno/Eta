@@ -186,7 +186,7 @@ internal object AgentRuntimeWire {
                     ?.takeIf { it.isNotBlank() } ?: runId
             }
 
-        val virtualScreenOwner: String
+        val conversationOwner: String
             get() = handoff?.let { entry ->
                 AgentExternalArchivePayload.from(entry.payload)?.let {
                     AgentExternalArchivePayload.conversationId(entry.source, it.conversationKey)

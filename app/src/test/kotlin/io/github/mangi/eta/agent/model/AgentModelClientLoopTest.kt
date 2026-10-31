@@ -148,78 +148,6 @@ class AgentModelClientLoopTest {
     }
 
     @Test
-    fun virtualUiPauseRestartsOnceObservesAndContinuesWithoutReplayingBatch() {
-        for (code in listOf("UI_NO_PROGRESS", "UI_APP_UNRESPONSIVE", "UI_INPUT_TIMEOUT")) {
-            val provider = ScriptedProvider(
-                assistant(finishReason = "tool_calls", toolCalls = listOf(
-                    toolCall("first", "get_current_context", "{}"),
-                    toolCall("skipped", "get_current_context", "{}"),
-                )),
-                assistant(content = "继续原任务", finishReason = "stop"),
-            )
-            val executed = mutableListOf<String>()
-            val events = mutableListOf<AgentEvent>()
-            var restarts = 0
-            val result = AgentModelClient.complete(modelConfig(), "开始", AgentModelClient.ToolExecutor { call ->
-                executed += call.name
-                if (call.name == "observe_screen") AgentModelClient.ToolResult("{\"ok\":true}")
-                else AgentModelClient.ToolResult("{\"ok\":false}", stop = AgentModelClient.ToolStop(code, "暂停"))
-            }, provider = provider, recoverVirtualUi = {
-                restarts++
-                AgentModelClient.ToolResult("{\"ok\":true,\"message\":\"先核对此前动作，再继续原任务\"}")
-            }, onEvent = events::add)
-            assertEquals("继续原任务", result.content)
-            assertEquals(1, restarts)
-            assertEquals(listOf("get_current_context", "observe_screen"), executed)
-            assertEquals(2, provider.requests.size)
-            assertTrue(provider.requests.last().toString().contains("先核对此前动作"))
-            assertFalse(events.any { it is AgentEvent.RunFailed })
-            assertEquals(listOf("first", "skipped"), result.transcript.filter { it.role == "tool" }.take(2).map { it.toolCallId })
-            assertEquals(2, result.transcript.filter { it.role == "tool" }.drop(2).size)
-        }
-    }
-
-    @Test
-    fun secondVirtualUiPauseEndsRunWithoutAnotherRestartOrModelRequest() {
-        val provider = ScriptedProvider(*Array(2) { round -> assistant(finishReason = "tool_calls",
-            toolCalls = listOf(toolCall("pause-$round", "get_current_context", "{}"))) })
-        var restarts = 0
-        val failure = assertThrows(AgentModelExecutionException::class.java) {
-            AgentModelClient.complete(modelConfig(), "开始", AgentModelClient.ToolExecutor { call ->
-                if (call.name == "observe_screen") AgentModelClient.ToolResult("{\"ok\":true}")
-                else AgentModelClient.ToolResult("{\"ok\":false}",
-                    stop = AgentModelClient.ToolStop("UI_INPUT_TIMEOUT", "暂停"))
-            }, provider = provider, recoverVirtualUi = { restarts++; AgentModelClient.ToolResult("{\"ok\":true}") })
-        }
-        assertEquals(1, restarts)
-        assertEquals(2, provider.requests.size)
-        assertTrue(failure.cause is AgentUiExecutionPausedException)
-        assertTrue(failure.message.orEmpty().contains("已尝试重启"))
-    }
-
-    @Test
-    fun failedRestartOrObservationPreservesCompleteToolBatchAndPauses() {
-        for (restartOk in listOf(false, true)) {
-            val provider = ScriptedProvider(assistant(finishReason = "tool_calls",
-                toolCalls = listOf(toolCall("pause", "get_current_context", "{}"))))
-            var observations = 0
-            val failure = assertThrows(AgentModelExecutionException::class.java) {
-                AgentModelClient.complete(modelConfig(), "开始", AgentModelClient.ToolExecutor { call ->
-                    if (call.name == "observe_screen") {
-                        observations++
-                        AgentModelClient.ToolResult("{\"ok\":false,\"code\":\"DISPLAY_FRAME_PENDING\"}")
-                    } else AgentModelClient.ToolResult("{\"ok\":false}",
-                        stop = AgentModelClient.ToolStop("UI_APP_UNRESPONSIVE", "暂停"))
-                }, provider = provider, recoverVirtualUi = { AgentModelClient.ToolResult("{\"ok\":$restartOk}") })
-            }
-            assertEquals(if (restartOk) 1 else 0, observations)
-            assertEquals(1, provider.requests.size)
-            assertTrue(failure.cause is AgentUiExecutionPausedException)
-            assertEquals(3, failure.transcript.count { it.role == "tool" })
-        }
-    }
-
-    @Test
     fun modelVisibleJsonCannotSpoofTrustedPauseControl() {
         val provider = ScriptedProvider(
             assistant(finishReason = "tool_calls", toolCalls = listOf(toolCall("read", "get_current_context", "{}"))),
@@ -899,7 +827,6 @@ class AgentModelClientLoopTest {
 
     @Test
     fun providerFailureCarriesCompletedToolTranscriptForSafeRecovery() {
-        var recoveryCalls = 0
         val provider = ScriptedProvider(
             responses = listOf(
                 { _, _ ->
@@ -923,13 +850,11 @@ class AgentModelClientLoopTest {
                     AgentModelClient.ToolResult("{\"ok\":true}")
                 },
                 provider = provider,
-                recoverVirtualUi = { recoveryCalls++; AgentModelClient.ToolResult("{\"ok\":true}") },
             )
         }
 
         assertEquals(listOf("assistant", "tool"), failure.transcript.map { it.role })
         assertEquals("先检查状态", failure.reasoningContent)
-        assertEquals(0, recoveryCalls)
     }
 
     @Test
