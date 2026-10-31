@@ -244,7 +244,7 @@ internal fun ChatMessageItem(
                                     SystemNoticeCode.ContextCompaction -> R.string.context_compaction
                                     SystemNoticeCode.ModelRetry -> R.string.system_notice_model_retry
                                     SystemNoticeCode.RuntimeFailed -> R.string.system_notice_runtime_failed
-                                    SystemNoticeCode.UiPaused -> R.string.virtual_screen_paused
+                                    SystemNoticeCode.UiPaused -> R.string.agent_ui_paused
                                     SystemNoticeCode.Interrupted -> R.string.system_notice_interrupted
                                 },
                             ),

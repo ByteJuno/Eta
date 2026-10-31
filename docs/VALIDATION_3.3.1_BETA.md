@@ -22,9 +22,8 @@
 两个跳过项分别受 Robolectric 子着色器支持和 macOS 缺少 `/proc` 限制。最后核对上游贡献分支时补回请求耗时、调度并发锁和显式坐标系，并增加对应迁移与边界回归；完整构建、单元测试和 Lint 重新执行。
 
 Release 版本 `3.3.1-beta.1`，版本码 `2026101001`，沿用 Eta-vivo 发布证书。实机功能结果来自 Debug，Release 未覆盖安装到测试手机。
-无线调试恢复后，已安装最终兼容版本的 Debug APK，重跑下表全部 7 组实机回归，共 167 项检查通过。
+无线调试恢复后，已安装最终兼容版本的 Debug APK，当时完成 7 组实机回归，共 167 项检查通过；下表仅保留与已删除显示引擎无关的记录。
 
-浮窗回归起初发现测试手势未指定 display，系统焦点在虚拟屏时手势跟随焦点路由，主屏预览没有收到拖动。测试现将点击、拖动明确发往主屏，浮窗 33 项检查重新通过。连续重启 instrumentation 时 OriginOS 曾暂未重新绑定无障碍服务，等待服务恢复后，GUI 边界和无树检查重新通过。
 
 ## 实机检查
 
@@ -32,28 +31,16 @@ Release 版本 `3.3.1-beta.1`，版本码 `2026101001`，沿用 Eta-vivo 发布�
 
 | 模式 | 检查数 | 覆盖 |
 | --- | ---: | --- |
-| `stop_resume` | 14 | 停止保留 display，续聊重新观察再操作；失败保留现场 |
 | `interjection` | 15 | 真实 Binder / Runtime 中断卡住的 HTTP 请求，插话进入下一请求，半截输出不进历史，无失败重试，错 run / 结束后拒绝 |
 | `feature_ui` | 43 | 提示词编辑保存重置，输入框插话与独立停止，延迟拒绝保留新草稿，学习同意一次、拒绝不写、完善传递方案 |
-| `floating` | 33 | 主屏预览、真实帧显示、10fps 上限、拖动贴边、折叠停帧、点击查看、查看租约交接、拖离展开、设置与任务结束回收 |
-| `gui_audit` | 30 | 连续 6 次操作使用附带的新观察，逐次确认实际计数变化 |
-| `gui_edge` | 20 | 仅 checked 状态变化、未点中目标、中文和 emoji 替换/追加 |
-| `gui_no_tree` | 12 | Canvas 无有效 UI 树时只执行一次动作，返回一张截图，变化状态为未知 |
 
 本地 SSE 插话测试从接收到结果核验耗时 53ms；这反映测试服务行为，不代表线上模型延迟。GUI 配对测量与限制见 [审计记录](AGENT_GUI_AUDIT_3.3.1.md)。
 
 最终兼容版本的优化后复查仍为 6 次工具调用、6 次已确认动作、0 张附图，工具累计耗时 3526ms。性能对比使用审计记录中的原始同机配对测量。
 
-测试命令示例（指定无线调试设备）：
-
-```bash
-adb -s <wireless-device> shell am instrument -w -e mode feature_ui \
-  io.github.mangi.eta.test/io.github.mangi.eta.validation.DeviceValidationRunner
-```
-
 ## 截图
 
-以下均为手机实机截图，正文来自公开测试 fixture。聊天图只裁出输入区域，浮窗图只裁出预览范围。测试截图临时移除测试窗口的安全标志并在 finally 恢复；正式窗口继续保护截图。
+以下均为手机实机截图，正文来自公开测试 fixture。聊天图只裁出输入区域。测试截图临时移除测试窗口的安全标志并在 finally 恢复；正式窗口继续保护截图。
 
 | 通知中心 | 方案详情 | 默认提示词 |
 | --- | --- | --- |
@@ -61,6 +48,5 @@ adb -s <wireless-device> shell am instrument -w -e mode feature_ui \
 
 ![执行中插话与停止](images/3.3.1-beta/chat-interjection.png)
 
-| 展开预览 | 贴边折叠 |
-| --- | --- |
-| ![悬浮预览](images/3.3.1-beta/floating-preview.png) | ![折叠气泡](images/3.3.1-beta/floating-preview-folded.png) |
+
+旧显示引擎相关说明已移除；当前规则见 [后台虚拟屏](VIRTUAL_SCREEN.md)。

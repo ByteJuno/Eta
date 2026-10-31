@@ -244,6 +244,13 @@ class AgentOverlayVisibilityPolicyTest {
         assertFalse(
             AgentOverlayVisibilityPolicy.shouldSuppressOverlayInEtaUi(
                 handoffSource = AgentRuntimeWire.AGENT_UI_HANDOFF_SOURCE,
+                etaUiInForeground = true,
+                virtualDisplayActive = true,
+            ),
+        )
+        assertFalse(
+            AgentOverlayVisibilityPolicy.shouldSuppressOverlayInEtaUi(
+                handoffSource = AgentRuntimeWire.AGENT_UI_HANDOFF_SOURCE,
                 etaUiInForeground = false,
             ),
         )

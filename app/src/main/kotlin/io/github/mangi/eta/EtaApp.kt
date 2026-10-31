@@ -57,6 +57,8 @@ class EtaApp : Application(), XposedServiceHelper.OnServiceListener {
         applicationScope.launch { TerminalRuntime.backgroundJobs(this@EtaApp).resume() }
         SettingsDataStore.init(this)
         val predictiveBackEnabled = runBlocking(Dispatchers.IO) {
+            runCatching { SettingsDataStore.migrateVirtualDisplayPreferences() }
+                .onFailure { AndroidAgentLogger.warn("Virtual display preference migration unavailable") }
             AppearanceSettingsRepository.settings().predictiveBackEnabled
         }
         PredictiveBackController.apply(applicationInfo, predictiveBackEnabled)
