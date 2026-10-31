@@ -92,6 +92,22 @@ class AgentLocalToolsDisplayRoutingTest {
         assertEquals(1, approvals)
     }
 
+    @Test
+    fun invalidMainScreenArgumentsFailBeforeAskingForApproval() {
+        tools { error("参数不合法时不应请求主屏审批") }.use { executor ->
+            listOf(
+                "tap" to """{"coordinate_space":"screen","y":10}""",
+                "tap" to """{"x":1,"y":2,"coordinate_space":"pixel"}""",
+                "swipe" to """{"coordinate_space":"normalized","x1":1,"y1":1,"x2":2}""",
+                "type_text" to """{"text":"hi","mode":"paste"}""",
+                "set_clipboard" to "{}",
+            ).forEach { (name, arguments) ->
+                val result = JSONObject(executor.execute(AgentModelClient.ToolCall("bad", name, arguments)).content)
+                assertEquals("$name $arguments", "INVALID_ARGUMENT", result.getString("code"))
+            }
+        }
+    }
+
     private fun tools(
         primary: Boolean = false,
         cancelled: () -> Boolean = { false },

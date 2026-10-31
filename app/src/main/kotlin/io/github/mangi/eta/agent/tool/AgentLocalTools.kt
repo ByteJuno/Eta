@@ -237,6 +237,35 @@ internal class AgentLocalTools(
         null
     }
 
+    /** 只做与执行时相同的纯参数解析；设备侧异常留给真正执行时处理。 */
+    private fun mainScreenArgumentError(tool: String, args: JSONObject): String? {
+        val error = runCatching {
+            val displayId = currentActiveDisplayId()
+            fun point(x: String, y: String) =
+                convertPoint(args.getInt(x), args.getInt(y), args.optString("coordinate_space"), displayId)
+            when (tool) {
+                "tap", "long_press" -> point("x", "y")
+                "tap_area", "swipe" -> { point("x1", "y1"); point("x2", "y2") }
+                "type_text" -> {
+                    val text = args.requiredText("text")
+                    when (args.optString("mode", "replace").trim().lowercase(Locale.ROOT).ifBlank { "replace" }) {
+                        "replace" -> Unit
+                        "append" -> {
+                            if (text.isEmpty()) throw InvalidToolArgumentException("append 模式的 text 不能为空")
+                            if (args.optNullableInt("index") != null) {
+                                throw InvalidToolArgumentException("append 只作用于当前输入焦点；要写入指定输入框请用 mode=replace")
+                            }
+                        }
+                        else -> throw InvalidToolArgumentException("mode 只能是 replace 或 append")
+                    }
+                }
+                "input_text", "replace_text", "paste_text", "set_clipboard" -> args.requiredText("text")
+            }
+        }.exceptionOrNull() ?: return null
+        if (error !is InvalidToolArgumentException && error !is org.json.JSONException) return null
+        return errorResult("INVALID_ARGUMENT", error.message ?: error.javaClass.simpleName)
+    }
+
     private fun approvalError(decision: MainScreenFallbackDecision): String = errorResult(
         "MAIN_SCREEN_FALLBACK_${decision.name}",
         "本轮主屏操作未获允许，未执行；请在 Eta 对话框、悬浮窗或通知中授权。拒绝、超时、取消后本轮不再请求。",
@@ -329,7 +358,11 @@ internal class AgentLocalTools(
             val mainAction = MainScreenApprovalPolicy.actsOnMainScreen(
                 toolCall.name, CanvasRoutingPolicy.isVirtualDisplay(currentActiveDisplayId()), args.optString("button"),
             )
-            if (mainAction) requireMainScreenApproval(toolCall.name)?.let { return@runCatching textResult(it) }
+            if (mainAction) {
+                // 参数不合法时直接报错，不为一次注定失败的动作去打扰用户审批。
+                mainScreenArgumentError(toolCall.name, args)?.let { return@runCatching textResult(it) }
+                requireMainScreenApproval(toolCall.name)?.let { return@runCatching textResult(it) }
+            }
             if (globalKey) {
                 activeDisplayId = Display.DEFAULT_DISPLAY
                 publishedObservation.set(PublishedObservation())
