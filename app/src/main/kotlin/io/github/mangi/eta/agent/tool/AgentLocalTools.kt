@@ -241,11 +241,14 @@ internal class AgentLocalTools(
     private fun mainScreenArgumentError(tool: String, args: JSONObject): String? {
         val error = runCatching {
             val displayId = currentActiveDisplayId()
-            fun point(x: String, y: String) =
-                convertPoint(args.getInt(x), args.getInt(y), args.optString("coordinate_space"), displayId)
+            // 先取齐全部整数坐标，再做坐标系换算（换算可能需要读屏幕尺寸）。
+            fun points(vararg names: String) {
+                val values = names.map { args.getInt(it) }
+                values.chunked(2).forEach { (x, y) -> convertPoint(x, y, args.optString("coordinate_space"), displayId) }
+            }
             when (tool) {
-                "tap", "long_press" -> point("x", "y")
-                "tap_area", "swipe" -> { point("x1", "y1"); point("x2", "y2") }
+                "tap", "long_press" -> points("x", "y")
+                "tap_area", "swipe" -> points("x1", "y1", "x2", "y2")
                 "type_text" -> {
                     val text = args.requiredText("text")
                     when (args.optString("mode", "replace").trim().lowercase(Locale.ROOT).ifBlank { "replace" }) {
