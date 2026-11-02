@@ -43,6 +43,7 @@ internal class AgentStructuredDeviceTools(
     private val root: BoundedRootCommandExecutor,
     private val rootAvailable: () -> Boolean = { RootAccess.isGranted },
     private val colorOs: () -> Boolean = { AgentToolCapabilities.isColorOsDevice() },
+    private val foregroundAction: (String, () -> JSONObject) -> JSONObject = { _, action -> action() },
 ) {
     private val chatImages = ChatImageSearchTools(root)
     private val colorOsMemoryTools = AgentColorOsMemoryTools(context, root)
@@ -308,6 +309,10 @@ internal class AgentStructuredDeviceTools(
         fallbackAction: String,
         tool: String,
     ): JSONObject {
+        return foregroundAction(tool) { dispatchClockIntent(directIntent, fallbackAction, tool) }
+    }
+
+    private fun dispatchClockIntent(directIntent: Intent, fallbackAction: String, tool: String): JSONObject {
         val packageManager = context.packageManager
         val preferred = Intent(directIntent).setPackage(COLOROS_CLOCK_PACKAGE)
         val direct =

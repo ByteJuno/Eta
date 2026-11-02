@@ -4,7 +4,7 @@ import android.content.Context
 import android.util.JsonReader
 import android.util.JsonToken
 import androidx.room.withTransaction
-import io.github.mangi.eta.agent.display.ConversationDisplayRoute
+import io.github.mangi.eta.agent.virtualdisplay.ConversationDisplayRoute
 import io.github.mangi.eta.agent.model.AgentConversationCodec
 import io.github.mangi.eta.agent.model.AgentModelClient
 import io.github.mangi.eta.agent.roleplay.RoleplayBinding

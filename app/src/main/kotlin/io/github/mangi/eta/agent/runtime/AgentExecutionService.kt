@@ -30,7 +30,6 @@ internal class AgentExecutionService : Service() {
     @Volatile private var startRejected = false
     private var progress: String = ""
     private var progressOwner: String = ""
-    private var floatingPreview: io.github.mangi.eta.agent.display.VirtualScreenFloatingPreviewHost? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -41,7 +40,6 @@ internal class AgentExecutionService : Service() {
             NotificationChannel(CHANNEL, getString(R.string.execution_channel), NotificationManager.IMPORTANCE_LOW),
         )
         ensureForeground()
-        if (!startRejected) floatingPreview = io.github.mangi.eta.agent.display.VirtualScreenFloatingPreviewHost(this)
     }
 
     private fun ensureForeground() {
@@ -74,7 +72,6 @@ internal class AgentExecutionService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onDestroy() {
-        floatingPreview?.close(); floatingPreview = null
         if (instance === this) {
             instance = null
             runStatus = null
@@ -108,7 +105,7 @@ internal class AgentExecutionService : Service() {
         val backgroundCommands = "terminal-background-commands" in ids
         val status = runStatus.takeIf { agentCount > 0 }
         val open = PendingIntent.getActivity(
-            this, 0, Intent(this, if (agentCount > 0 && io.github.mangi.eta.agent.display.VirtualScreenSession.isActive()) io.github.mangi.eta.agent.display.VirtualScreenViewerActivity::class.java else MainActivity::class.java).apply {
+            this, 0, Intent(this, MainActivity::class.java).apply {
                 if (agentCount == 0 && backgroundCommands) action = MainActivity.ACTION_OPEN_TERMINAL
             },
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,

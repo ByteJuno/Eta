@@ -20,6 +20,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.github.mangi.eta.R
+import io.github.mangi.eta.agent.virtualdisplay.ConversationDisplayChoice
 import top.yukonga.miuix.kmp.basic.DropdownImpl
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
@@ -63,10 +64,11 @@ internal fun DisplayRouteChip(
         animationSpec = tween(durationMillis = 160),
         label = "display_route_content",
     )
-    val options = listOf(
-        false to stringResource(R.string.chat_display_virtual),
-        true to stringResource(R.string.chat_display_primary),
-    )
+    val options = ConversationDisplayChoice.entries.map { route ->
+        route.usesPrimary to stringResource(
+            if (route.usesPrimary) R.string.chat_display_primary else R.string.chat_display_virtual,
+        )
+    }
     val current = options.first { it.first == choice.primary }.second
     Box(modifier = modifier) {
         IconButton(

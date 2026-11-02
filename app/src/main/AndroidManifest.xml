@@ -68,6 +68,7 @@
             android:exported="false" android:hardwareAccelerated="true" />
 
 
+        <receiver android:name=".agent.virtualdisplay.MainScreenFallbackReceiver" android:exported="false" />
         <activity
             android:name=".ui.MainActivity"
             android:exported="true"
@@ -94,15 +95,6 @@
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </activity>
-        <receiver android:name=".agent.display.MainScreenFallbackReceiver" android:exported="false" />
-        <receiver android:name=".agent.display.VirtualScreenPreviewReceiver" android:exported="false" />
-        <activity android:name=".agent.display.VirtualScreenViewerActivity" android:exported="false"
-            android:label="@string/virtual_screen_title" android:theme="@style/Theme.Eta"
-            android:windowSoftInputMode="adjustResize" />
-        <activity android:name=".agent.display.VirtualScreenHomeActivity" android:exported="false"
-            android:excludeFromRecents="true" android:resizeableActivity="true"
-            android:taskAffinity="io.github.mangi.eta.virtualscreen"
-            android:theme="@style/Theme.Eta" />
 
         <service
             android:name=".agent.voice.EtaVoiceInteractionService"
@@ -200,13 +192,6 @@
             </intent-filter>
         </service>
 
-        <!-- Only UID 0 with an app-generated pending nonce can register the display Binder. -->
-        <provider
-            android:name=".agent.display.VirtualScreenRootBridgeProvider"
-            android:authorities="${applicationId}.display-bridge"
-            android:exported="true"
-            android:grantUriPermissions="false"
-            tools:ignore="ExportedContentProvider" />
 
         <provider
             android:name=".agent.accessibility.AgentAccessibilityHealthProvider"

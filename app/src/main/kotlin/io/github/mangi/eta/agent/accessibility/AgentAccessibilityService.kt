@@ -154,15 +154,9 @@ class AgentAccessibilityService : AccessibilityService() {
     fun captureNodeSnapshot(
         maxNodes: Int,
         displayId: Int = android.view.Display.DEFAULT_DISPLAY,
-        refreshCache: Boolean = false,
     ): NodeSnapshot? = runOnMainSync {
         val startedAt = SystemClock.elapsedRealtime()
-        if (refreshCache) {
-            // Root input can finish before the ROM delivers the cache-invalidation event.
-            // Refresh only this display's subtree, then obtain the root and children again.
-            rootForDisplay(displayId)?.let { clearCachedSubtree(it) }
-        }
-        val root = rootForDisplay(displayId) ?: return@runOnMainSync null
+        val root = activeRootOnDisplay(displayId) ?: return@runOnMainSync null
         val nodeLimit = maxNodes.coerceIn(1, 120)
         val indexedNodes = mutableListOf<IndexedNode>()
         val traversal = NodeTraversalState(
@@ -189,7 +183,7 @@ class AgentAccessibilityService : AccessibilityService() {
         ).also { snapshot ->
             AndroidAgentLogger.debug {
                 "Agent accessibility action=observe_tree observation=${snapshot.id} " +
-                    "nodes=${snapshot.nodes.size} visited=${traversal.visitedNodes} " +
+                    "display=$displayId nodes=${snapshot.nodes.size} visited=${traversal.visitedNodes} " +
                     "truncated=${traversal.truncated} " +
                     "elapsed_ms=${SystemClock.elapsedRealtime() - startedAt}"
             }
@@ -197,36 +191,64 @@ class AgentAccessibilityService : AccessibilityService() {
     }
 
     /** 临时查询不发布任何全局节点状态，适用于 wait_for_text。 */
-    fun queryNodes(maxNodes: Int, displayId: Int = android.view.Display.DEFAULT_DISPLAY): List<UiNode> =
+    fun queryNodes(
+        maxNodes: Int,
+        displayId: Int = android.view.Display.DEFAULT_DISPLAY,
+    ): List<UiNode> =
         captureNodeSnapshot(maxNodes, displayId)?.nodes.orEmpty()
 
     fun currentPackageName(displayId: Int = android.view.Display.DEFAULT_DISPLAY): String? =
-        runOnMainSync { rootForDisplay(displayId)?.packageName?.toString() }
-
-    /** Secondary-display requests never use rootInActiveWindow, which can refer to the viewer. */
-    private fun rootForDisplay(displayId: Int): AccessibilityNodeInfo? {
-        if (displayId == android.view.Display.DEFAULT_DISPLAY) {
-            val active = rootInActiveWindow
-            if (active != null && (active.window == null || active.window.displayId == displayId)) return active
-        }
-        return windowsOnAllDisplays.get(displayId).orEmpty()
-            .filter { it.displayId == displayId && it.type == AccessibilityWindowInfo.TYPE_APPLICATION }
-            .sortedWith(compareByDescending<AccessibilityWindowInfo> { it.isFocused }.thenByDescending { it.layer })
-            .firstNotNullOfOrNull { it.root }
-    }
+        runOnMainSync { activeRootOnDisplay(displayId)?.packageName?.toString() }
 
     fun displaySize(displayId: Int = android.view.Display.DEFAULT_DISPLAY): Pair<Int, Int>? = runCatching {
-        val display = getSystemService(android.hardware.display.DisplayManager::class.java).getDisplay(displayId)
-            ?: return@runCatching null
+        if (displayId != android.view.Display.DEFAULT_DISPLAY) {
+            val dm = getSystemService(android.hardware.display.DisplayManager::class.java)
+            val targetDisplay = dm?.getDisplay(displayId)
+            if (targetDisplay != null) {
+                val point = Point()
+                @Suppress("DEPRECATION")
+                targetDisplay.getRealSize(point)
+                if (point.x > 0 && point.y > 0) return@runCatching point.x to point.y
+            }
+            return@runCatching null
+        }
+        val windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
         val point = Point()
         @Suppress("DEPRECATION")
-        display.getRealSize(point)
+        windowManager.defaultDisplay.getRealSize(point)
         if (point.x > 0 && point.y > 0) point.x to point.y else null
     }.getOrNull()
 
+    private fun activeRootOnDisplay(displayId: Int): AccessibilityNodeInfo? {
+        if (displayId == android.view.Display.DEFAULT_DISPLAY) {
+            val active = rootInActiveWindow
+            // 全局活动窗口也可能位于虚拟屏，不能把它当作物理主屏观察或路由依据。
+            if (active != null && (active.window == null || active.window.displayId == displayId)) return active
+        }
+        val displayWindows = runCatching {
+            windowsOnAllDisplays.get(displayId)
+        }.getOrNull().orEmpty()
+        if (displayWindows.isEmpty()) return null
+        val sorted = displayWindows
+            .filter { it.displayId == displayId && it.type != AccessibilityWindowInfo.TYPE_ACCESSIBILITY_OVERLAY }
+            .sortedWith(
+                compareByDescending<AccessibilityWindowInfo> {
+                    it.type == AccessibilityWindowInfo.TYPE_APPLICATION && (it.isFocused || it.isActive)
+                }
+                    .thenByDescending { it.type == AccessibilityWindowInfo.TYPE_APPLICATION }
+                    .thenByDescending { it.isFocused || it.isActive }
+                    .thenByDescending { it.layer },
+            )
+        for (window in sorted) {
+            val root = runCatching { window.root }.getOrNull()
+            if (root != null) return root
+        }
+        return null
+    }
+
     internal fun packageWindowVisibility(packageName: String): PackageWindowVisibility =
         runOnMainSync {
-            val activeRoot = rootForDisplay(android.view.Display.DEFAULT_DISPLAY)
+            val activeRoot = activeRootOnDisplay(android.view.Display.DEFAULT_DISPLAY)
             if (activeRoot?.packageName?.toString() == packageName) {
                 return@runOnMainSync PackageWindowVisibility.VISIBLE
             }
@@ -544,15 +566,19 @@ class AgentAccessibilityService : AccessibilityService() {
         return executeScroll(scrollable, direction, targetIndex = index, amount = amount, displayId = snapshot.displayId)
     }
 
-    internal fun scrollCurrent(direction: ScrollDirection, amount: ScrollAmount = ScrollAmount.PAGE): ScrollActionResult {
+    internal fun scrollCurrent(
+        direction: ScrollDirection,
+        amount: ScrollAmount = ScrollAmount.PAGE,
+        displayId: Int = android.view.Display.DEFAULT_DISPLAY,
+    ): ScrollActionResult {
         val target = runOnMainSync {
-            rootForDisplay(android.view.Display.DEFAULT_DISPLAY)?.let { root -> findBestScrollableNode(root, direction) }
+            activeRootOnDisplay(displayId)?.let { root -> findBestScrollableNode(root, direction, displayId) }
         } ?: return ScrollActionResult.failure(
             direction = direction,
             code = "NO_ACTIVE_WINDOW",
             message = "当前活动窗口不可访问",
         )
-        return executeScroll(target, direction, targetIndex = null, amount = amount)
+        return executeScroll(target, direction, targetIndex = null, amount = amount, displayId = displayId)
     }
 
     private fun executeScroll(
@@ -767,7 +793,10 @@ class AgentAccessibilityService : AccessibilityService() {
         }
     }
 
-    fun inputTextFocused(text: String, displayId: Int = android.view.Display.DEFAULT_DISPLAY): NodeActionResult = runNodeActionOnMainSync {
+    fun inputTextFocused(
+        text: String,
+        displayId: Int = android.view.Display.DEFAULT_DISPLAY,
+    ): NodeActionResult = runNodeActionOnMainSync {
         val node = findFocusedEditableNode(displayId)
             ?: return@runNodeActionOnMainSync NodeActionResult.failure(
                 "NO_FOCUSED_EDITABLE",
@@ -806,7 +835,7 @@ class AgentAccessibilityService : AccessibilityService() {
             }
         }
         return runNodeActionOnMainSync {
-            val node = findFocusedEditableNode(displayId)
+            val node = findFocusedEditableNode(snapshot?.displayId ?: displayId)
                 ?: return@runNodeActionOnMainSync NodeActionResult.failure(
                     "NO_FOCUSED_EDITABLE",
                     "没有获得输入焦点的可编辑节点",
@@ -816,8 +845,11 @@ class AgentAccessibilityService : AccessibilityService() {
     }
 
     /** 优先直接按选区写入，只有目标拒绝 SET_TEXT 时才回退系统粘贴。 */
-    fun pasteText(text: String): NodeActionResult = runNodeActionOnMainSync {
-        val node = findFocusedEditableNode()
+    fun pasteText(
+        text: String,
+        displayId: Int = android.view.Display.DEFAULT_DISPLAY,
+    ): NodeActionResult = runNodeActionOnMainSync {
+        val node = findFocusedEditableNode(displayId)
             ?: return@runNodeActionOnMainSync NodeActionResult.failure(
                 "NO_FOCUSED_EDITABLE",
                 "没有获得输入焦点的可编辑节点",
@@ -905,7 +937,9 @@ class AgentAccessibilityService : AccessibilityService() {
         }.isSuccess
     }
 
-    fun imeEnter(displayId: Int = android.view.Display.DEFAULT_DISPLAY): NodeActionResult = runNodeActionOnMainSync {
+    fun imeEnter(
+        displayId: Int = android.view.Display.DEFAULT_DISPLAY,
+    ): NodeActionResult = runNodeActionOnMainSync {
         val node = findFocusedEditableNode(displayId)
             ?: return@runNodeActionOnMainSync NodeActionResult.failure(
                 "NO_FOCUSED_EDITABLE",
@@ -918,7 +952,12 @@ class AgentAccessibilityService : AccessibilityService() {
         }
     }
 
-    fun gestureTap(x: Float, y: Float, durationMs: Long = 50, displayId: Int = android.view.Display.DEFAULT_DISPLAY): NodeActionResult =
+    fun gestureTap(
+        x: Float,
+        y: Float,
+        durationMs: Long = 50,
+        displayId: Int = android.view.Display.DEFAULT_DISPLAY,
+    ): NodeActionResult =
         dispatchGestureResult(
             Path().apply {
                 moveTo(x, y)
@@ -989,6 +1028,55 @@ class AgentAccessibilityService : AccessibilityService() {
         JSONObject()
             .put("available", true)
             .put("package", currentPackageName().orEmpty())
+
+    /**
+     * 截取指定 displayId 的完整画面（用于虚拟屏的无障碍截图回退）。
+     * 虚拟屏本身不挂载 Eta 系统浮层，无需逐窗口排除。
+     */
+    fun captureDisplayScreenshot(displayId: Int): ScreenshotCaptureResult {
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            return ScreenshotCaptureResult.unavailable()
+        }
+        val latch = CountDownLatch(1)
+        var bitmap: Bitmap? = null
+        var failureCode: Int? = null
+        runCatching {
+            takeScreenshot(displayId, screenshotExecutor, object : TakeScreenshotCallback {
+                override fun onSuccess(screenshot: ScreenshotResult) {
+                    try {
+                        bitmap = convertToSoftwareBitmap(screenshot)
+                    } finally {
+                        latch.countDown()
+                    }
+                }
+
+                override fun onFailure(errorCode: Int) {
+                    failureCode = errorCode
+                    latch.countDown()
+                }
+            })
+        }.onFailure {
+            failureCode = ERROR_TAKE_SCREENSHOT_INTERNAL_ERROR
+            latch.countDown()
+        }
+        val completed = try {
+            latch.await(2, TimeUnit.SECONDS)
+        } catch (_: InterruptedException) {
+            Thread.currentThread().interrupt()
+            false
+        }
+        val captured = bitmap
+        return ScreenshotCaptureResult(
+            bitmap = captured,
+            complete = completed && captured != null,
+            expectedWindows = 1,
+            capturedWindows = if (captured != null) 1 else 0,
+            missingWindowIds = if (captured != null) emptyList() else listOf(displayId),
+            failureCodes = failureCode?.let { mapOf(displayId to it) }.orEmpty(),
+            timedOut = !completed,
+            criticalWindowMissing = captured == null,
+        )
+    }
 
     /**
      * 截取当前屏幕，排除 TYPE_ACCESSIBILITY_OVERLAY 浮层（glow/orb/bubble/resultCard/GestureIndicator）。
@@ -1295,8 +1383,10 @@ class AgentAccessibilityService : AccessibilityService() {
         )
     }
 
-    private fun findFocusedEditableNode(displayId: Int = android.view.Display.DEFAULT_DISPLAY): AccessibilityNodeInfo? {
-        val root = rootForDisplay(displayId) ?: return null
+    private fun findFocusedEditableNode(
+        displayId: Int = android.view.Display.DEFAULT_DISPLAY,
+    ): AccessibilityNodeInfo? {
+        val root = activeRootOnDisplay(displayId) ?: return null
         val inputFocus = runCatching {
             root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
         }.getOrNull()
@@ -1335,6 +1425,7 @@ class AgentAccessibilityService : AccessibilityService() {
     private fun findBestScrollableNode(
         root: AccessibilityNodeInfo,
         direction: ScrollDirection,
+        displayId: Int = android.view.Display.DEFAULT_DISPLAY,
     ): AccessibilityNodeInfo {
         val candidates = mutableListOf<ScrollCandidate>()
         val activePath = hashSetOf<AccessibilityNodeInfo>()
@@ -1350,7 +1441,7 @@ class AgentAccessibilityService : AccessibilityService() {
             try {
                 if (!node.isVisibleToUser) return
                 if (node.isEnabled && node.hasScrollCapability()) {
-                    val bounds = clippedNodeBounds(node)
+                    val bounds = clippedNodeBounds(node, displayId)
                     val supportRank = node.directionSupportRank(direction)
                     if (
                         !node.exposesOnlyOppositeAxis(direction) &&
@@ -1504,7 +1595,10 @@ class AgentAccessibilityService : AccessibilityService() {
         return chooseScrollMethod(node, direction.opposite()) != null
     }
 
-    private fun clippedNodeBounds(node: AccessibilityNodeInfo, displayId: Int = android.view.Display.DEFAULT_DISPLAY): Rect {
+    private fun clippedNodeBounds(
+        node: AccessibilityNodeInfo,
+        displayId: Int = android.view.Display.DEFAULT_DISPLAY,
+    ): Rect {
         val bounds = node.bounds()
         val size = displaySize(displayId)
         if (size != null) {
@@ -1644,7 +1738,7 @@ class AgentAccessibilityService : AccessibilityService() {
             ?: return NodeValidation.Invalid(
                 NodeActionResult.failure("INVALID_NODE_INDEX", "观察快照中不存在节点 index=$index"),
             )
-        val activeRoot = rootForDisplay(snapshot.displayId)
+        val activeRoot = activeRootOnDisplay(snapshot.displayId)
             ?: return NodeValidation.Invalid(
                 NodeActionResult.failure("STALE_WINDOW", "当前活动窗口不可访问，请重新观察屏幕"),
             )
@@ -1854,10 +1948,12 @@ class AgentAccessibilityService : AccessibilityService() {
                 return@post
             }
             val gesture = runCatching {
-                GestureDescription.Builder()
-                    .setDisplayId(displayId)
-                    .addStroke(GestureDescription.StrokeDescription(path, 0, durationMs))
-                    .build()
+                GestureDescription.Builder().apply {
+                    if (displayId != android.view.Display.DEFAULT_DISPLAY) {
+                        setDisplayId(displayId)
+                    }
+                    addStroke(GestureDescription.StrokeDescription(path, 0, durationMs))
+                }.build()
             }.getOrElse {
                 outcome.set(GestureDispatch.NOT_DISPATCHED)
                 gate.finish()

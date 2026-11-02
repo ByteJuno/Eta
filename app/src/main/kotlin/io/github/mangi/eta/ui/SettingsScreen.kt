@@ -311,12 +311,6 @@ private fun SettingsPageContent(
                         startAction = { EtaPreferenceIcon(icon = Icons.Rounded.FilterAlt, tint = EtaPreferenceColors.Blue) },
                         onClick = { onNavigate(AppRoute.Tasks) },
                     )
-                    EtaPreferenceDivider()
-                    EtaArrowPreference(
-                        title = stringResource(R.string.virtual_screen_title),
-                        startAction = { EtaPreferenceIcon(icon = Icons.Rounded.Smartphone, tint = EtaPreferenceColors.Blue) },
-                        onClick = { onNavigate(AppRoute.VirtualScreen) },
-                    )
 
                     EtaPreferenceDivider()
                     EtaArrowPreference(
@@ -398,6 +392,16 @@ private fun SettingsPageContent(
                             )
                         },
                         onClick = { onNavigate(AppRoute.WebToolsSettings) },
+                    )
+
+                    EtaPreferenceDivider()
+                    SwitchPref(
+                        context = context,
+                        prefs = agentPrefs,
+                        title = stringResource(R.string.settings_virtual_display_title),
+                        key = Prefs.Keys.AGENT_VIRTUAL_DISPLAY_ENABLED,
+                        icon = Icons.Rounded.Layers,
+                        iconTint = EtaPreferenceColors.Blue,
                     )
 
                     EtaPreferenceDivider()

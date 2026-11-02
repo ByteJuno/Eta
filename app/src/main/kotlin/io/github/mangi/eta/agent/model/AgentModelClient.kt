@@ -114,7 +114,6 @@ internal object AgentModelClient {
         onContextSnapshot: (AgentContextSnapshot) -> Unit = {},
         onTranscript: (List<ConversationMessage>) -> Unit = {},
         restrictedToolNames: Set<String>? = null,
-        recoverVirtualUi: ((ToolStop) -> ToolResult)? = null,
         onEvent: (AgentEvent) -> Unit = {}
     ): ModelResponse.Text {
         config.validate()
@@ -129,8 +128,6 @@ internal object AgentModelClient {
             rootAvailable = initialCapabilities.rootAvailable,
             roleplayContext = roleplayContext,
             executionContext = executionContext,
-            virtualScreenEnabled = initialCapabilities.virtualScreenEnabled,
-            virtualScreenFallbackEnabled = initialCapabilities.virtualScreenFallbackEnabled,
         )
         if (rewriteReply) {
             messages.put(messages.length() - 1, AgentConversationCodec.userTextMessage(
@@ -149,7 +146,7 @@ internal object AgentModelClient {
         val transcript = JSONArray()
         // 旧 history 中的无效消息可能在组装时被跳过，系统边界不能由 history 条数倒推。
         val systemCount = AgentPromptBuilder.buildSystemMessages(
-            config, skillContext, memoryContext, initialCapabilities.rootAvailable, roleplayContext, executionContext, initialCapabilities.virtualScreenEnabled, initialCapabilities.virtualScreenFallbackEnabled,
+            config, skillContext, memoryContext, initialCapabilities.rootAvailable, roleplayContext, executionContext,
         ).length()
         fun toolsFor(capabilities: AgentToolCapabilities): JSONArray {
             if (rewriteReply) return JSONArray()
@@ -194,25 +191,18 @@ internal object AgentModelClient {
         // 工具目录与系统提示都是请求前缀，按轮重算会让一次瞬时状态抖动废掉整段缓存。
         // Root 授权真正变化时整体重建；其余能力只增不减：短暂不可用的工具仍保留，执行时自行报告错误码。
         var promptRootAvailable = initialCapabilities.rootAvailable
-        var promptVirtualScreenEnabled = initialCapabilities.virtualScreenEnabled
-        var promptVirtualScreenFallbackEnabled = initialCapabilities.virtualScreenFallbackEnabled
         var publishedTools = tools
         fun toolsForRound(): JSONArray {
             val capabilities = capabilitiesProvider()
-            if (capabilities.rootAvailable != promptRootAvailable ||
-                capabilities.virtualScreenEnabled != promptVirtualScreenEnabled ||
-                capabilities.virtualScreenFallbackEnabled != promptVirtualScreenFallbackEnabled
+            if (capabilities.rootAvailable != promptRootAvailable
             ) {
                 val systemMessages = AgentPromptBuilder.buildSystemMessages(
                     config, skillContext, memoryContext, capabilities.rootAvailable, roleplayContext, executionContext,
-                    capabilities.virtualScreenEnabled, capabilities.virtualScreenFallbackEnabled,
                 )
                 for (index in 0 until systemMessages.length()) {
                     messages.put(index, systemMessages.getJSONObject(index))
                 }
                 promptRootAvailable = capabilities.rootAvailable
-                promptVirtualScreenEnabled = capabilities.virtualScreenEnabled
-                promptVirtualScreenFallbackEnabled = capabilities.virtualScreenFallbackEnabled
                 publishedTools = toolsFor(capabilities)
                 return publishedTools
             }
@@ -259,7 +249,6 @@ internal object AgentModelClient {
             purpose = if (rewriteReply) ProviderRequestPurpose.REPLY_REWRITE else ProviderRequestPurpose.CHAT,
             roleplayContext = roleplayContext,
             initialSupplementIndex = initialSupplementIndex,
-            recoverVirtualUi = recoverVirtualUi.takeIf { !rewriteReply && restrictedToolNames == null },
             toolsForRound = ::toolsForRound,
         )
         val result = try {

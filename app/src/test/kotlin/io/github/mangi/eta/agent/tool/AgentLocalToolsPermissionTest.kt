@@ -200,18 +200,17 @@ class AgentLocalToolsPermissionTest {
 
     @Test
     fun screenshotCoordinatesRequireACurrentScreenshotCoordinateSpace() {
-        val tools = tools()
+        tools().use { tools ->
+            val result = tools.execute(
+                AgentModelClient.ToolCall(
+                    id = "call-1",
+                    name = "tap",
+                    argumentsJson = "{\"x\":100,\"y\":200,\"coordinate_space\":\"screenshot\"}",
+                ),
+            )
 
-        val result = tools.execute(
-            AgentModelClient.ToolCall(
-                id = "call-1",
-                name = "tap",
-                argumentsJson = "{\"x\":100,\"y\":200,\"coordinate_space\":\"screenshot\"}",
-            ),
-        )
-
-        assertEquals("INVALID_ARGUMENT", JSONObject(result.content).getString("code"))
-        tools.close()
+            assertEquals("INVALID_ARGUMENT", JSONObject(result.content).getString("code"))
+        }
     }
 
     @Test
@@ -389,6 +388,8 @@ class AgentLocalToolsPermissionTest {
             memoryWritable = memoryWritable,
             learningProposalWriter = learningProposalWriter,
             rootAvailable = rootAvailable,
+            // 这里只验证权限与参数边界；主屏审批由 AgentLocalToolsDisplayRoutingTest 覆盖。
+            virtualDisplayEnabled = { false },
             deviceSensitiveReadToolsEnabled = sensitiveReadEnabled,
             screenObservationProvider = screenObservationProvider,
             beforeToolExecution = beforeToolExecution,

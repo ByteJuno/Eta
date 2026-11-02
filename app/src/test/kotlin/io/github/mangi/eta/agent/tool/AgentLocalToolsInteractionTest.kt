@@ -3,7 +3,6 @@ package io.github.mangi.eta.agent.tool
 import android.content.Context
 import io.github.mangi.eta.agent.model.AgentModelClient
 import io.github.mangi.eta.core.AgentLogger
-import io.github.mangi.eta.data.model.Settings
 import java.util.UUID
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
@@ -116,7 +115,7 @@ class AgentLocalToolsInteractionTest {
         deviceDirectToolsEnabled = { true },
         memoryToolsEnabled = { false },
         rootAvailable = { false },
-        virtualScreenSettings = { Settings(virtualScreenEnabled = false) },
+        virtualDisplayEnabled = { false },
         beforeToolExecution = beforeTool,
         isRunCancelled = isCancelled,
         onInteractionAcquired = onAcquired,

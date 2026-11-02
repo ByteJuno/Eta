@@ -2,6 +2,9 @@ package io.github.mangi.eta.config
 
 import android.content.Context
 import android.content.SharedPreferences
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import io.github.mangi.eta.agent.virtualdisplay.VirtualDisplayPreferenceMigration
 import io.github.libxposed.service.XposedService
 
 /**
@@ -45,6 +48,7 @@ internal object Prefs {
         const val AGENT_THINKING_ENABLED = "agent_thinking_enabled"
         const val AGENT_AUTO_COMPACTION_ENABLED = "agent_auto_compaction_enabled"
         const val AGENT_SUBAGENT_ENABLED = "agent_subagent_enabled"
+        const val AGENT_VIRTUAL_DISPLAY_ENABLED = "agent_virtual_display_enabled"
         const val AGENT_RUNTIME_CONFIG_JSON = "agent_runtime_config_json"
 
         /** 全部布尔开关及其默认值。 */
@@ -66,6 +70,7 @@ internal object Prefs {
             AGENT_THINKING_ENABLED to true,
             AGENT_AUTO_COMPACTION_ENABLED to true,
             AGENT_SUBAGENT_ENABLED to true,
+            AGENT_VIRTUAL_DISPLAY_ENABLED to true,
         )
 
         /** 由 Eta Runtime 最终裁决、不要求 Xposed 框架在线的开关。 */
@@ -78,6 +83,7 @@ internal object Prefs {
             AGENT_THINKING_ENABLED,
             AGENT_AUTO_COMPACTION_ENABLED,
             AGENT_SUBAGENT_ENABLED,
+            AGENT_VIRTUAL_DISPLAY_ENABLED,
         )
     }
 
@@ -88,6 +94,15 @@ internal object Prefs {
     @Volatile
     private var localAgent: SharedPreferences? = null
 
+    private val virtualDisplayEnabledState = MutableStateFlow(true)
+    val virtualDisplayEnabledFlow = virtualDisplayEnabledState.asStateFlow()
+    // SharedPreferences 只弱引用 listener；单例强持有，输入栏选择器实时跟随设置页。
+    private val localListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+        if (key == Keys.AGENT_VIRTUAL_DISPLAY_ENABLED) {
+            virtualDisplayEnabledState.value = isEnabled(Keys.AGENT_VIRTUAL_DISPLAY_ENABLED)
+        }
+    }
+
     /** App 进程调用：初始化不依赖 Xposed Service 的 Agent 配置。 */
     fun initLocal(context: Context) {
         if (localAgent == null) {
@@ -96,9 +111,23 @@ internal object Prefs {
                     localAgent = context.applicationContext.getSharedPreferences(
                         LOCAL_AGENT_GROUP,
                         Context.MODE_PRIVATE,
-                    )
+                    ).also { prefs ->
+                        prefs.registerOnSharedPreferenceChangeListener(localListener)
+                        virtualDisplayEnabledState.value = prefs.getBoolean(Keys.AGENT_VIRTUAL_DISPLAY_ENABLED, true)
+                    }
                 }
             }
+        }
+    }
+
+    /** 先落盘新 key，成功后 DataStore 才能清理旧 key；中断后重复执行也不覆盖用户新设置。 */
+    fun migrateVirtualDisplayPreference(legacyEnabled: Boolean?): Boolean {
+        val prefs = localAgent ?: return false
+        val key = Keys.AGENT_VIRTUAL_DISPLAY_ENABLED
+        val current = if (prefs.contains(key)) prefs.getBoolean(key, true) else null
+        val value = VirtualDisplayPreferenceMigration.valueToMigrate(current, legacyEnabled) ?: return true
+        return prefs.edit().putBoolean(key, value).commit().also { success ->
+            if (success) virtualDisplayEnabledState.value = value
         }
     }
 

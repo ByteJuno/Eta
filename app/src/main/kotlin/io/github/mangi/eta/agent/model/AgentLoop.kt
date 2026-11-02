@@ -40,7 +40,6 @@ internal class AgentLoop(
     private val purpose: ProviderRequestPurpose = ProviderRequestPurpose.CHAT,
     private val roleplayContext: RoleplayRunContext? = null,
     initialSupplementIndex: Int = 0,
-    private val recoverVirtualUi: ((AgentModelClient.ToolStop) -> AgentModelClient.ToolResult)? = null,
 ) {
     data class Result(
         val content: String,
@@ -64,7 +63,6 @@ internal class AgentLoop(
         roleplay = roleplayContext != null,
     )
     private var supplementIndex = initialSupplementIndex
-    private var virtualUiRecoveryAttempted = false
 
     fun contextSnapshot(): AgentContextSnapshot? = context.snapshot()
 
@@ -212,15 +210,8 @@ internal class AgentLoop(
                 appendToolImages(round, outcomes)
                 publishTranscript()
                 stop?.let { paused ->
-                    if (!paused.isVirtualUiPause) throw AgentModelFailure(paused.code, false, paused.message)
-                    if (recoverVirtualUi == null || virtualUiRecoveryAttempted) {
-                        throw AgentUiExecutionPausedException(paused.copy(message =
-                            if (virtualUiRecoveryAttempted) "已尝试重启虚拟屏中的应用，但操作仍未恢复，任务已暂停并保留现场。请检查应用后继续；此前动作的效果仍需核对。"
-                            else paused.message))
-                    }
-                    virtualUiRecoveryAttempted = true
-                    round += 1
-                    recoverVirtualUi(round, paused)
+                    if (paused.isVirtualUiPause) throw AgentUiExecutionPausedException(paused)
+                    throw AgentModelFailure(paused.code, false, paused.message)
                 }
                 round += 1
                 continue
@@ -248,45 +239,6 @@ internal class AgentLoop(
                 reasoningContent = reasoningSnapshot(),
                 sensitiveToolCallIds = sensitiveToolCallIds.toSet(),
             )
-        }
-    }
-
-    private fun recoverVirtualUi(round: Int, stop: AgentModelClient.ToolStop) {
-        val restart = AgentModelClient.ToolCall("$operationId-ui-restart-$round", "virtual_screen",
-            JSONObject().put("action", "restart").toString())
-        val observe = AgentModelClient.ToolCall("$operationId-ui-observe-$round", "observe_screen",
-            JSONObject().put("include_screenshot", true).put("include_ui_tree", true).toString())
-        appendMessage(AgentConversationCodec.assistantHistoryMessage(
-            JSONObject().put("content", "虚拟屏应用操作未恢复，先尝试重启应用并重新观察。"),
-            listOf(restart, observe),
-        ).put("_eta_message_id", "assistant-$operationId-$round"))
-        onEvent(AgentEvent.AssistantReceived(round, 0, "", listOf(restart.name, observe.name)))
-        onEvent(AgentEvent.ToolStarted(round, restart.id, restart.name,
-            traceFormatter.summarizeArguments(restart), traceFormatter.displayCommand(restart)))
-        runController.throwIfCancelled()
-        val restarted = try {
-            requireNotNull(recoverVirtualUi).invoke(stop)
-        } catch (_: Exception) {
-            runController.throwIfCancelled()
-            AgentModelClient.ToolResult(JSONObject().put("ok", false).put("code", "UI_RESTART_FAILED").toString())
-        }
-        sensitiveToolCallIds += restart.id
-        emitToolFinished(round, restart, restarted)
-        appendMessage(AgentConversationCodec.toolResultMessage(restart, restarted))
-        publishTranscript()
-        val recoverySucceeded = restarted.stop == null &&
-            runCatching { JSONObject(restarted.content).optBoolean("ok") }.getOrDefault(false)
-        val observation = if (recoverySucceeded) executeTool(round, observe) else rejectedToolOutcome(
-            round, observe, "UI_EXECUTION_PAUSED", "应用重启未完成，任务已暂停并保留现场。",
-        )
-        appendMessage(AgentConversationCodec.toolResultMessage(observation.call, observation.result))
-        appendToolImages(round, listOf(observation))
-        publishTranscript()
-        if (!recoverySucceeded || observation.result.stop != null ||
-            !runCatching { JSONObject(observation.result.content).optBoolean("ok") }.getOrDefault(false)) {
-            throw AgentUiExecutionPausedException(stop.copy(message =
-                if (recoverySucceeded) "已重启虚拟屏中的应用，但重新观察未成功，任务已暂停并保留现场。请检查应用后继续。"
-                else "已尝试重启虚拟屏中的应用，但重启未完成，任务已暂停并保留现场。请检查应用后继续。"))
         }
     }
 
