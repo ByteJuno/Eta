@@ -23,15 +23,15 @@ import androidx.compose.ui.unit.dp
 import io.github.mangi.eta.R
 import io.github.mangi.eta.data.db.LearningProposalEntity
 import io.github.mangi.eta.ui.app.NotificationCenterStore
-import io.github.mangi.eta.ui.components.EtaCard
-import io.github.mangi.eta.ui.components.EtaTextButton
 import io.github.mangi.eta.ui.components.ListEmptyState
 import io.github.mangi.eta.ui.components.MiuixScaffoldPage
 import io.github.mangi.eta.ui.markdown.MarkdownTone
 import io.github.mangi.eta.ui.markdown.StaticMarkdown
 import org.json.JSONObject
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
+import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 @Composable
@@ -43,9 +43,9 @@ internal fun NotificationCenterScreen(store: NotificationCenterStore, onDetail: 
         store.notice?.let { item(key = "notice") { InboxText(it) } }
         item(key = "filters") {
             Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                EtaTextButton(stringResource(R.string.inbox_all), { pendingOnly = false },
+                TextButton(stringResource(R.string.inbox_all), { pendingOnly = false },
                     colors = if (!pendingOnly) ButtonDefaults.textButtonColorsPrimary() else ButtonDefaults.textButtonColors())
-                EtaTextButton(stringResource(R.string.inbox_pending_count, store.pendingCount), { pendingOnly = true },
+                TextButton(stringResource(R.string.inbox_pending_count, store.pendingCount), { pendingOnly = true },
                     colors = if (pendingOnly) ButtonDefaults.textButtonColorsPrimary() else ButtonDefaults.textButtonColors())
             }
         }
@@ -53,7 +53,7 @@ internal fun NotificationCenterScreen(store: NotificationCenterStore, onDetail: 
             ListEmptyState(title = stringResource(R.string.inbox_empty), summary = stringResource(R.string.inbox_empty_summary))
         }
         items(visible, key = { it.id }) { proposal ->
-            EtaCard(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
+            Card(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
                 insideMargin = PaddingValues(16.dp), onClick = { onDetail(proposal.id) }) {
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(proposal.kindLabel() + " · " + proposal.statusLabel(), style = MiuixTheme.textStyles.body2,
@@ -89,21 +89,21 @@ internal fun LearningProposalDetailScreen(id: String, store: NotificationCenterS
                 InboxText(JSONObject(proposal.argumentsJson).optString("description"))
             }
             item(key = "content") {
-                EtaCard(Modifier.fillMaxWidth().padding(16.dp), insideMargin = PaddingValues(16.dp)) {
+                Card(Modifier.fillMaxWidth().padding(16.dp), insideMargin = PaddingValues(16.dp)) {
                     SelectionContainer { StaticMarkdown(proposal.detailMarkdown.ifBlank { proposal.actionLabel() }, MarkdownTone.Answer) }
                 }
             }
             item(key = "actions") {
                 Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (proposal.status == "pending") EtaTextButton(stringResource(R.string.inbox_approve),
+                    if (proposal.status == "pending") TextButton(stringResource(R.string.inbox_approve),
                         { store.approve(id) }, enabled = !store.busy, modifier = Modifier.fillMaxWidth(),
                         colors = ButtonDefaults.textButtonColorsPrimary())
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         if (proposal.status in setOf("pending", "failed", "stale", "uncertain")) {
-                            EtaTextButton(stringResource(R.string.inbox_reject), { store.reject(id) },
+                            TextButton(stringResource(R.string.inbox_reject), { store.reject(id) },
                                 enabled = !store.busy, modifier = Modifier.weight(1f))
                         }
-                        EtaTextButton(stringResource(R.string.inbox_refine), { store.refine(id, onRefine) },
+                        TextButton(stringResource(R.string.inbox_refine), { store.refine(id, onRefine) },
                             enabled = !store.busy && proposal.status !in setOf("applying", "refining"), modifier = Modifier.weight(1f))
                     }
                 }

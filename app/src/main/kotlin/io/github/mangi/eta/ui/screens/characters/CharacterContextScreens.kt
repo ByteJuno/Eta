@@ -25,10 +25,13 @@ internal fun DefaultAssistantPromptScreen(store: CharacterLibraryStore, onBack: 
                 store::updateDefaultPrompt, !store.busy, minLines = 10)
         }
         item(key = "actions") {
-            Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                EtaTextButton(stringResource(R.string.default_prompt_reset), onClick = store::resetDefaultPrompt,
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 12.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                TextButton(stringResource(R.string.default_prompt_reset), onClick = store::resetDefaultPrompt,
                     enabled = !store.busy, modifier = Modifier.weight(1f))
-                EtaTextButton(stringResource(R.string.default_prompt_save), onClick = { store.saveDefaultPrompt(onBack) },
+                TextButton(stringResource(R.string.default_prompt_save), onClick = { store.saveDefaultPrompt(onBack) },
                     enabled = !store.busy, modifier = Modifier.weight(1f), colors = ButtonDefaults.textButtonColorsPrimary())
             }
         }

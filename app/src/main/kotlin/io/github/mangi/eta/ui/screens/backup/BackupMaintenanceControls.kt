@@ -4,23 +4,26 @@ import android.content.Intent
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
 import io.github.mangi.eta.R
 import io.github.mangi.eta.core.DiagnosticsBundle
 import io.github.mangi.eta.data.repository.AutoBackupScheduler
-import io.github.mangi.eta.ui.components.EtaArrowPreference
-import io.github.mangi.eta.ui.components.EtaPreference
-import io.github.mangi.eta.ui.components.EtaPreferenceGroup
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import top.yukonga.miuix.kmp.basic.BasicComponent
+import top.yukonga.miuix.kmp.basic.Card
+import top.yukonga.miuix.kmp.preference.ArrowPreference
 
 @Composable
 internal fun BackupMaintenanceControls() {
@@ -64,10 +67,12 @@ internal fun BackupMaintenanceControls() {
             finally { busy = false }
         }
     }
-    EtaPreferenceGroup {
-        EtaPreference(title = stringResource(R.string.auto_backup_warning_title),
+    Card(
+        modifier = Modifier.padding(horizontal = 12.dp).padding(bottom = 12.dp),
+    ) {
+        BasicComponent(title = stringResource(R.string.auto_backup_warning_title),
             summary = stringResource(R.string.auto_backup_warning))
-        EtaArrowPreference(title = stringResource(if (enabled) R.string.auto_backup_disable else R.string.auto_backup_enable),
+        ArrowPreference(title = stringResource(if (enabled) R.string.auto_backup_disable else R.string.auto_backup_enable),
             summary = stringResource(R.string.auto_backup_summary), enabled = !busy,
             onClick = {
                 if (enabled) {
@@ -75,7 +80,7 @@ internal fun BackupMaintenanceControls() {
                     enabled = false
                 } else folder.launch(null)
             })
-        EtaArrowPreference(title = stringResource(R.string.auto_backup_now),
+        ArrowPreference(title = stringResource(R.string.auto_backup_now),
             summary = if (busy) stringResource(R.string.data_backup_working) else status,
             enabled = enabled && !busy,
             onClick = {
@@ -87,7 +92,7 @@ internal fun BackupMaintenanceControls() {
                     finally { busy = false }
                 }
             })
-        EtaArrowPreference(title = stringResource(R.string.diagnostics_export),
+        ArrowPreference(title = stringResource(R.string.diagnostics_export),
             summary = stringResource(R.string.diagnostics_summary), enabled = !busy,
             onClick = { diagnostics.launch("eta-diagnostics.zip") })
     }

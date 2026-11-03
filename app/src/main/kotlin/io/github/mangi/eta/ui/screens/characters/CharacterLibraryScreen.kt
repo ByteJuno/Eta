@@ -71,8 +71,8 @@ internal fun CharacterLibraryScreen(
         },
     ) {
         item(key = "default-assistant") {
-            EtaPreferenceGroup(modifier = Modifier.padding(horizontal = CharacterCardPadding, vertical = 8.dp)) {
-                EtaArrowPreference(
+            Card(modifier = Modifier.padding(horizontal = CharacterCardPadding, vertical = 8.dp)) {
+                ArrowPreference(
                     title = stringResource(R.string.default_prompt_title),
                     summary = stringResource(R.string.default_prompt_summary),
                     onClick = { onNavigate(AppRoute.DefaultAssistantPrompt) },
