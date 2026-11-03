@@ -41,7 +41,7 @@ class ToolSchemaCompatTest {
         val sent = chatToolsWithoutTopLevelCombinators(source)
         val schema = sent.getJSONObject(1).getJSONObject("function").getJSONObject("parameters")
         TOP_LEVEL_SCHEMA_COMBINATORS.forEach { assertFalse(schema.has(it)) }
-        assertEquals(setOf("url", "document_id"), schema.getJSONObject("properties").keySet())
+        assertEquals(setOf("url", "document_id"), schema.getJSONObject("properties").keys().asSequence().toSet())
         assertFalse(schema.getBoolean("additionalProperties"))
         // 本地校验仍用原始定义，二选一约束不能被改掉。
         assertTrue(source.getJSONObject(1).getJSONObject("function").getJSONObject("parameters").has("oneOf"))
@@ -76,6 +76,6 @@ class ToolSchemaCompatTest {
         val schema = (0 until sent.length()).map(sent::getJSONObject).first { it.optString("name") == "fetch_url" }
             .getJSONObject("parameters")
         TOP_LEVEL_SCHEMA_COMBINATORS.forEach { assertFalse(schema.has(it)) }
-        assertEquals(setOf("url", "document_id"), schema.getJSONObject("properties").keySet())
+        assertEquals(setOf("url", "document_id"), schema.getJSONObject("properties").keys().asSequence().toSet())
     }
 }
