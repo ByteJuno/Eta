@@ -408,14 +408,7 @@
   <string name="ui_about_github_star_title">Source Code</string>
   <string name="ui_about_github_star_hint">If Eta helps you, please star it on GitHub — it means a lot to us</string>
   <string name="ui_about_version_title">Version</string>
-  <string name="ui_about_update_title">Check for updates</string>
-  <string name="ui_about_update_checking">Checking…</string>
   <string name="ui_about_feedback_title">Feedback</string>
-  <string name="ui_update_already_latest">Already on the latest version</string>
-  <string name="ui_update_check_failed">Update check failed. Try again later</string>
-  <string name="ui_update_available_title">Update available</string>
-  <string name="ui_update_available_message">Latest version %1$s, current version %2$s</string>
-  <string name="ui_update_go_download">Download</string>
   <string name="ui_click_to_reinstall_dc60de">Click to reinstall</string>
   <string name="ui_environmental_status_5b32a1">Environment status</string>
   <string name="ui_user_skills_748e7f">Installed by you</string>
@@ -1439,6 +1432,8 @@
     <string name="automation_run">Run now</string>
     <string name="automation_cancel">Cancel execution</string>
     <string name="automation_delete">Delete task</string>
+    <string name="automation_delete_confirm_title">Delete this task?</string>
+    <string name="automation_delete_confirm_message">“%1$s” and its run history will be deleted. A running execution will be stopped.</string>
     <string name="automation_channel">Automatic tasks</string>
     <string name="automation_monitor_title">Monitoring task triggers</string>
     <string name="automation_monitor_summary">Enabled event tasks receive local events while this service is running.</string>

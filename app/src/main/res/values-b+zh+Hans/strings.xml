@@ -401,14 +401,7 @@
   <string name="ui_about_github_star_title">源代码</string>
   <string name="ui_about_github_star_hint">如果 Eta 帮到了你，请在 GitHub 点个 Star，这对我们意义重大</string>
   <string name="ui_about_version_title">版本</string>
-  <string name="ui_about_update_title">检查更新</string>
-  <string name="ui_about_update_checking">正在检查…</string>
   <string name="ui_about_feedback_title">问题反馈</string>
-  <string name="ui_update_already_latest">当前已是最新版本</string>
-  <string name="ui_update_check_failed">检查更新失败，请稍后重试</string>
-  <string name="ui_update_available_title">发现新版本</string>
-  <string name="ui_update_available_message">最新版本 %1$s，当前版本 %2$s</string>
-  <string name="ui_update_go_download">前往下载</string>
   <string name="ui_click_to_reinstall_dc60de">点击重新安装</string>
   <string name="ui_environmental_status_5b32a1">环境状态</string>
   <string name="ui_user_skills_748e7f">用户安装</string>
@@ -1420,6 +1413,8 @@
     <string name="automation_run">立即运行</string>
     <string name="automation_cancel">取消执行</string>
     <string name="automation_delete">删除任务</string>
+    <string name="automation_delete_confirm_title">删除这个任务？</string>
+    <string name="automation_delete_confirm_message">将删除“%1$s”及其运行记录，正在执行的运行会被中止。</string>
     <string name="automation_channel">自动任务</string>
     <string name="automation_monitor_title">正在监控任务触发器</string>
     <string name="automation_monitor_summary">已启用的事件任务在此服务运行期间接收本地事件。</string>

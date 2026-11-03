@@ -36,6 +36,8 @@ import io.github.mangi.eta.R
 import io.github.mangi.eta.agent.automation.AgentTaskScheduler
 import io.github.mangi.eta.agent.automation.AgentTaskTools
 import io.github.mangi.eta.data.db.EtaDatabase
+import io.github.mangi.eta.data.db.AgentTaskEntity
+import io.github.mangi.eta.ui.components.MiuixDialogActions
 import io.github.mangi.eta.ui.components.MiuixScaffoldPage
 import io.github.mangi.eta.ui.components.StatusSuccess
 import io.github.mangi.eta.ui.components.StatusWarning
@@ -57,6 +59,7 @@ import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.preference.SwitchPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
+import top.yukonga.miuix.kmp.window.WindowDialog
 
 @Composable
 internal fun AgentTasksScreen(onBack: () -> Unit) {
@@ -67,6 +70,7 @@ internal fun AgentTasksScreen(onBack: () -> Unit) {
     val scope = rememberCoroutineScope()
     var triggers by remember { mutableStateOf<List<TaskTriggerUi>>(emptyList()) }
     var selectedTrigger by remember { mutableStateOf<TaskTriggerUi?>(null) }
+    var deleteTarget by remember { mutableStateOf<AgentTaskEntity?>(null) }
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     var notice by remember { mutableStateOf<String?>(null) }
     fun execute(tool: String, args: JSONObject) {
@@ -217,13 +221,31 @@ internal fun AgentTasksScreen(onBack: () -> Unit) {
                     TaskActions(
                         onRun = { execute("tasks_run", JSONObject().put("taskId", task.id)) },
                         onCancel = { execute("tasks_cancel", JSONObject().put("taskId", task.id)) },
-                        onDelete = { execute("tasks_delete", JSONObject().put("taskId", task.id)) },
+                        onDelete = { deleteTarget = task },
                     )
                 }
             }
         }
     }
     selectedTrigger?.let { trigger -> TriggerDetails(trigger) { selectedTrigger = null } }
+    deleteTarget?.let { task ->
+        WindowDialog(
+            show = true,
+            title = stringResource(R.string.automation_delete_confirm_title),
+            summary = stringResource(R.string.automation_delete_confirm_message, task.name),
+            onDismissRequest = { deleteTarget = null },
+        ) {
+            MiuixDialogActions(
+                confirmText = stringResource(R.string.automation_delete),
+                onCancel = { deleteTarget = null },
+                onConfirm = {
+                    deleteTarget = null
+                    execute("tasks_delete", JSONObject().put("taskId", task.id))
+                },
+                destructive = true,
+            )
+        }
+    }
 }
 
 @Composable

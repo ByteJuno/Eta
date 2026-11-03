@@ -4,6 +4,8 @@
 - 功能分支仅用于编辑和审查；获准改动合入 `virtual-screen` 后再构建。
 - 推送后执行：`gh workflow run android-release.yml --repo ByteJuno/Eta --ref virtual-screen`。
 - 核对运行提交号，验证 Lint、完整单元测试、Debug 和签名 Release；不自动安装或公开发布。
+- 非标签构建的 versionCode 由 CI 按提交时间（北京时间）生成：`yyyyMMdd` + 当日 15 分钟时段 `00–95`，只会高于 `app/build.gradle.kts` 中的手写值；后续提交的包可直接覆盖安装，同一提交重复构建结果一致。
+- fork 已关闭应用内更新检查：上游 Release 使用不同签名，无法覆盖安装本 fork。
 - 这是执行约定。当前凭据缺少 workflow scope，工作流级分支限制未部署；已有 main push、标签与 PR 触发规则仍存在，避免触发这些入口。
 - 下方与本约定冲突的旧流程仅供历史参考。
 
