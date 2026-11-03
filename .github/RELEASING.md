@@ -6,7 +6,9 @@
 - 核对运行提交号，验证 Lint、完整单元测试、Debug 和签名 Release；不自动安装或公开发布。
 - 非标签构建的 versionCode 由 CI 按提交时间（北京时间）生成：`yyyyMMdd` + 当日 15 分钟时段 `00–95`，只会高于 `app/build.gradle.kts` 中的手写值；后续提交的包可直接覆盖安装，同一提交重复构建结果一致。
 - fork 已关闭应用内更新检查：上游 Release 使用不同签名，无法覆盖安装本 fork。
-- 这是执行约定。当前凭据缺少 workflow scope，工作流级分支限制未部署；已有 main push、标签与 PR 触发规则仍存在，避免触发这些入口。
+- `virtual-screen` 构建成功后，`保存构建草稿` job 会把签名 Release APK 存为 Release 草稿 `build-<短提交号>`（不创建标签，仅维护者可见），保留最近 5 个；Artifact 过期后从草稿下载。草稿未经真机验收不要发布。
+- 若 PR Check 已在完全相同的代码树上通过（功能分支从 `virtual-screen` 最新提交开出并直接合并时成立），Eta Build 的 `Lint 与单元测试` job 会跳过重复检查；树不同或发版标签时照常完整检查。
+- main push、标签与 PR 触发规则仍保留，日常避免触发这些入口。
 - 下方与本约定冲突的旧流程仅供历史参考。
 
 # Eta 发布流程
