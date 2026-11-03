@@ -36,13 +36,9 @@ import io.github.mangi.eta.R
 import io.github.mangi.eta.agent.automation.AgentTaskScheduler
 import io.github.mangi.eta.agent.automation.AgentTaskTools
 import io.github.mangi.eta.data.db.EtaDatabase
-import io.github.mangi.eta.ui.components.EtaPreference
-import io.github.mangi.eta.ui.components.EtaPreferenceColors
-import io.github.mangi.eta.ui.components.EtaPreferenceDivider
-import io.github.mangi.eta.ui.components.EtaPreferenceGroup
-import io.github.mangi.eta.ui.components.EtaSwitchPreference
-import io.github.mangi.eta.ui.components.EtaTextButton
 import io.github.mangi.eta.ui.components.MiuixScaffoldPage
+import io.github.mangi.eta.ui.components.StatusSuccess
+import io.github.mangi.eta.ui.components.StatusWarning
 import java.time.DayOfWeek
 import java.time.Instant
 import java.time.OffsetDateTime
@@ -54,8 +50,12 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
+import top.yukonga.miuix.kmp.basic.BasicComponent
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
+import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.basic.TextButton
+import top.yukonga.miuix.kmp.preference.SwitchPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 @Composable
@@ -91,8 +91,10 @@ internal fun AgentTasksScreen(onBack: () -> Unit) {
         onBack = onBack,
     ) {
         item {
-            EtaPreferenceGroup {
-                EtaPreference(
+            Card(
+                modifier = Modifier.padding(horizontal = 12.dp).padding(bottom = 12.dp),
+            ) {
+                BasicComponent(
                     title = stringResource(R.string.automation_create_hint),
                     summary = stringResource(R.string.automation_create_summary),
                 )
@@ -113,7 +115,7 @@ internal fun AgentTasksScreen(onBack: () -> Unit) {
                     text = message,
                     color = MiuixTheme.colorScheme.error,
                     style = MiuixTheme.textStyles.body2,
-                    modifier = Modifier.padding(horizontal = 32.dp).padding(bottom = 16.dp),
+                    modifier = Modifier.padding(horizontal = 28.dp).padding(bottom = 12.dp),
                 )
             }
         }
@@ -122,14 +124,16 @@ internal fun AgentTasksScreen(onBack: () -> Unit) {
             val recentRuns = runs.filter { it.taskId == task.id }.take(3)
             val colors = MiuixTheme.colorScheme
             val statusColor = when (task.lastStatus) {
-                "completed" -> EtaPreferenceColors.Green
+                "completed" -> StatusSuccess
                 "failed", "interrupted" -> colors.error
                 "queued", "running" -> colors.primary
-                "configuration_required" -> EtaPreferenceColors.Orange
+                "configuration_required" -> StatusWarning
                 else -> colors.onSurfaceVariantSummary
             }
-            EtaPreferenceGroup {
-                EtaSwitchPreference(
+            Card(
+                modifier = Modifier.padding(horizontal = 12.dp).padding(bottom = 12.dp),
+            ) {
+                SwitchPreference(
                     title = task.name,
                     summary = task.prompt,
                     checked = task.enabled,
@@ -141,7 +145,6 @@ internal fun AgentTasksScreen(onBack: () -> Unit) {
                         )
                     },
                 )
-                EtaPreferenceDivider(hasLeading = false)
                 Column(
                     modifier = Modifier.fillMaxWidth().padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -237,8 +240,8 @@ private fun TaskDetail(label: String, value: String) {
 
 @Composable
 private fun TaskActions(onRun: () -> Unit, onCancel: () -> Unit, onDelete: () -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        EtaTextButton(
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        TextButton(
             text = stringResource(R.string.automation_run),
             onClick = onRun,
             modifier = Modifier.fillMaxWidth(),
@@ -248,9 +251,9 @@ private fun TaskActions(onRun: () -> Unit, onCancel: () -> Unit, onDelete: () ->
         )
         Row(
             modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            EtaTextButton(
+            TextButton(
                 text = stringResource(R.string.automation_cancel),
                 onClick = onCancel,
                 modifier = Modifier.weight(1f).fillMaxHeight(),
@@ -259,7 +262,7 @@ private fun TaskActions(onRun: () -> Unit, onCancel: () -> Unit, onDelete: () ->
                 insideMargin = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
                 textStyle = MiuixTheme.textStyles.body2,
             )
-            EtaTextButton(
+            TextButton(
                 text = stringResource(R.string.automation_delete),
                 onClick = onDelete,
                 modifier = Modifier.weight(1f).fillMaxHeight(),

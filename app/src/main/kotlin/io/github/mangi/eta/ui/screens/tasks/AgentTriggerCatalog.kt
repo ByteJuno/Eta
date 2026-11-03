@@ -24,11 +24,11 @@ import androidx.compose.ui.unit.dp
 import io.github.mangi.eta.R
 import io.github.mangi.eta.agent.automation.AgentTaskRules
 import io.github.mangi.eta.agent.automation.AgentTaskScheduler
-import io.github.mangi.eta.ui.components.EtaPreferenceGroup
-import io.github.mangi.eta.ui.components.EtaWindowDialog
+import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
+import top.yukonga.miuix.kmp.window.WindowDialog
 
 internal enum class TaskTriggerGroup(val label: Int) {
     TIME(R.string.automation_triggers_time), DEVICE(R.string.automation_triggers_device),
@@ -55,7 +55,7 @@ internal fun loadTaskTriggers(context: Context): List<TaskTriggerUi> {
 
 @Composable
 internal fun TriggerCatalogHeading(triggers: List<TaskTriggerUi>) {
-    Column(Modifier.fillMaxWidth().padding(horizontal = 32.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    Column(Modifier.fillMaxWidth().padding(horizontal = 28.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text(stringResource(R.string.automation_triggers_title), style = MiuixTheme.textStyles.body1, color = MiuixTheme.colorScheme.onBackground)
         Text(stringResource(R.string.automation_triggers_count, triggers.count { it.available }, triggers.size),
             style = MiuixTheme.textStyles.footnote1, color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
@@ -65,7 +65,9 @@ internal fun TriggerCatalogHeading(triggers: List<TaskTriggerUi>) {
 @Composable
 internal fun TriggerCatalogGroup(group: TaskTriggerGroup, triggers: List<TaskTriggerUi>, onClick: (TaskTriggerUi) -> Unit) {
     val context = LocalContext.current
-    EtaPreferenceGroup {
+    Card(
+        modifier = Modifier.padding(horizontal = 12.dp).padding(bottom = 12.dp),
+    ) {
         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(stringResource(group.label), style = MiuixTheme.textStyles.body2, color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -98,7 +100,7 @@ internal fun TriggerDetails(trigger: TaskTriggerUi, onDismiss: () -> Unit) {
         "device_boot" -> R.string.automation_trigger_scope_boot
         else -> R.string.automation_trigger_scope_monitor
     }
-    EtaWindowDialog(show = true, title = triggerTitle(context, trigger.type), onDismissRequest = onDismiss) {
+    WindowDialog(show = true, title = triggerTitle(context, trigger.type), onDismissRequest = onDismiss) {
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(stringResource(if (trigger.available) R.string.automation_trigger_available else R.string.automation_trigger_permission),
                 color = if (trigger.available) MiuixTheme.colorScheme.primary else MiuixTheme.colorScheme.onSurfaceVariantSummary)

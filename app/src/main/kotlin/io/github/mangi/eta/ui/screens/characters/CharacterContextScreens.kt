@@ -11,9 +11,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.res.stringResource
 import io.github.mangi.eta.R
 import io.github.mangi.eta.ui.app.CharacterLibraryStore
-import io.github.mangi.eta.ui.components.EtaTextButton
 import io.github.mangi.eta.ui.components.MiuixScaffoldPage
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
+import top.yukonga.miuix.kmp.basic.TextButton
 
 @Composable
 internal fun DefaultAssistantPromptScreen(store: CharacterLibraryStore, onBack: () -> Unit) {
@@ -25,10 +25,13 @@ internal fun DefaultAssistantPromptScreen(store: CharacterLibraryStore, onBack: 
                 store::updateDefaultPrompt, !store.busy, minLines = 10)
         }
         item(key = "actions") {
-            Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                EtaTextButton(stringResource(R.string.default_prompt_reset), onClick = store::resetDefaultPrompt,
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 12.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                TextButton(stringResource(R.string.default_prompt_reset), onClick = store::resetDefaultPrompt,
                     enabled = !store.busy, modifier = Modifier.weight(1f))
-                EtaTextButton(stringResource(R.string.default_prompt_save), onClick = { store.saveDefaultPrompt(onBack) },
+                TextButton(stringResource(R.string.default_prompt_save), onClick = { store.saveDefaultPrompt(onBack) },
                     enabled = !store.busy, modifier = Modifier.weight(1f), colors = ButtonDefaults.textButtonColorsPrimary())
             }
         }
@@ -42,8 +45,13 @@ internal fun CharacterPersonaScreen(store: CharacterLibraryStore, onBack: () -> 
         item(key = "name") { CharacterTextField("称呼", store.personaDraft.name, { store.updatePersona(name = it) }, !store.busy, singleLine = true) }
         item(key = "persona") { CharacterTextField("身份与关系", store.personaDraft.description, { store.updatePersona(description = it) }, !store.busy, minLines = 6) }
         item(key = "save") {
-            EtaTextButton("保存人设", onClick = { store.savePersona(onBack) }, enabled = !store.busy,
-                modifier = Modifier.fillMaxWidth().padding(16.dp), colors = ButtonDefaults.textButtonColorsPrimary())
+            TextButton(
+                text = "保存人设",
+                onClick = { store.savePersona(onBack) },
+                enabled = !store.busy,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 12.dp),
+                colors = ButtonDefaults.textButtonColorsPrimary(),
+            )
         }
     }
 }
@@ -56,9 +64,23 @@ internal fun CharacterMemoryScreen(id: String, store: CharacterLibraryStore, onB
             CharacterTextField("剧情与关系", store.memoryDraft, store::updateMemory, !store.busy, minLines = 10)
         }
         item(key = "actions") {
-            Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                EtaTextButton("重新载入", onClick = { store.loadMemory(id, force = true) }, enabled = !store.busy, modifier = Modifier.weight(1f))
-                EtaTextButton("保存记忆", onClick = { store.saveMemory(id) }, enabled = !store.busy, modifier = Modifier.weight(1f), colors = ButtonDefaults.textButtonColorsPrimary())
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 12.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                TextButton(
+                    text = "重新载入",
+                    onClick = { store.loadMemory(id, force = true) },
+                    enabled = !store.busy,
+                    modifier = Modifier.weight(1f),
+                )
+                TextButton(
+                    text = "保存记忆",
+                    onClick = { store.saveMemory(id) },
+                    enabled = !store.busy,
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.textButtonColorsPrimary(),
+                )
             }
         }
     }
