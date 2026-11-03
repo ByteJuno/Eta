@@ -109,6 +109,13 @@ internal object ResponsesRequestBuilder {
         }
     }
 
+    private fun responseParameters(parameters: Any?): Any =
+        when (parameters) {
+            is JSONObject -> withoutTopLevelCombinators(parameters).let { if (it === parameters) deepCopy(it) else it }
+            null -> JSONObject()
+            else -> deepCopy(parameters)
+        }
+
     private fun buildTools(tools: JSONArray, hostedWebSearchEnabled: Boolean): JSONArray =
         JSONArray().also { result ->
             for (index in 0 until tools.length()) {
@@ -119,7 +126,7 @@ internal object ResponsesRequestBuilder {
                         .put("type", "function")
                         .put("name", function.optString("name"))
                         .put("description", function.optString("description"))
-                        .put("parameters", deepCopy(function.opt("parameters") ?: JSONObject()))
+                        .put("parameters", responseParameters(function.opt("parameters")))
                         .put("strict", false),
                 )
             }
