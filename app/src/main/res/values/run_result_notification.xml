@@ -6,4 +6,5 @@
     <string name="run_result_stopped">Eta task stopped</string>
     <string name="run_result_paused">Eta task paused, needs you</string>
     <string name="run_result_open_hint">Tap to view the result in Eta</string>
+    <string name="run_result_quiet_channel">Task results (card already shown)</string>
 </resources>

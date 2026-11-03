@@ -22,6 +22,8 @@ import io.github.mangi.eta.ui.MainActivity
  */
 internal object RunResultNotification {
     private const val CHANNEL = "eta_run_results"
+    // The framework Builder has no setSilent(); silence is a channel property instead.
+    private const val QUIET_CHANNEL = "eta_run_results_quiet"
     private const val TAG = "eta-run-result"
     private const val MAX_TEXT_CHARS = 600
 
@@ -53,6 +55,14 @@ internal object RunResultNotification {
                     NotificationManager.IMPORTANCE_DEFAULT,
                 ),
             )
+            manager.createNotificationChannel(
+                NotificationChannel(
+                    QUIET_CHANNEL,
+                    context.getString(R.string.run_result_quiet_channel),
+                    NotificationManager.IMPORTANCE_LOW,
+                ),
+            )
+            val channel = if (silent) QUIET_CHANNEL else CHANNEL
             val open = Intent(context, MainActivity::class.java)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
                 .apply {
@@ -82,7 +92,7 @@ internal object RunResultNotification {
             )
             val text = detail.trim().ifBlank { context.getString(R.string.run_result_open_hint) }
                 .take(MAX_TEXT_CHARS)
-            val notification = Notification.Builder(context, CHANNEL)
+            val notification = Notification.Builder(context, channel)
                 .setSmallIcon(R.drawable.ic_notification)
                 .setContentTitle(title)
                 .setContentText(text)
@@ -91,7 +101,7 @@ internal object RunResultNotification {
                 // Answers may contain private data; the lock screen shows only the title.
                 .setVisibility(Notification.VISIBILITY_PRIVATE)
                 .setPublicVersion(
-                    Notification.Builder(context, CHANNEL)
+                    Notification.Builder(context, channel)
                         .setSmallIcon(R.drawable.ic_notification)
                         .setContentTitle(title)
                         .build(),
@@ -99,7 +109,6 @@ internal object RunResultNotification {
                 .setContentIntent(pending)
                 .setAutoCancel(true)
                 .setOnlyAlertOnce(true)
-                .setSilent(silent)
                 .build()
             manager.notify(TAG, runId.hashCode(), notification)
         }.onFailure { failure ->

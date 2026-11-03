@@ -86,4 +86,16 @@ class RunResultNotificationTest {
         RunResultNotification.show(context, "long", RunResultNotification.Outcome.SUCCESS, "字".repeat(2_000), null, null)
         assertEquals(600, manager.activeNotifications.single().notification.extras.getCharSequence(Notification.EXTRA_TEXT)!!.length)
     }
+
+    @Test
+    fun silentNoticeUsesLowImportanceChannelSoTheShownCardIsNotDoubled() {
+        RunResultNotification.show(context, "quiet", RunResultNotification.Outcome.SUCCESS, "已完成", "c", null, silent = true)
+        RunResultNotification.show(context, "loud", RunResultNotification.Outcome.SUCCESS, "已完成", "c2", null)
+
+        val byText = manager.activeNotifications.associate { it.tag + it.id to it.notification.channelId }
+        val quietChannel = manager.getNotificationChannel(byText.values.first { it.endsWith("_quiet") })
+        val loudChannel = manager.getNotificationChannel(byText.values.first { !it.endsWith("_quiet") })
+        assertEquals(NotificationManager.IMPORTANCE_LOW, quietChannel.importance)
+        assertEquals(NotificationManager.IMPORTANCE_DEFAULT, loudChannel.importance)
+    }
 }

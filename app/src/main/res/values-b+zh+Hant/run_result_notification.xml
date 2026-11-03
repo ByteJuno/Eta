@@ -6,4 +6,5 @@
     <string name="run_result_stopped">Eta 任務已停止</string>
     <string name="run_result_paused">Eta 任務已暫停，需要你處理</string>
     <string name="run_result_open_hint">點擊在 Eta 中查看結果</string>
+    <string name="run_result_quiet_channel">任務結果（已顯示結果卡片）</string>
 </resources>
