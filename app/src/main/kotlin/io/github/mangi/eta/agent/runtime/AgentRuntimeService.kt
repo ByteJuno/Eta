@@ -97,41 +97,6 @@ internal class AgentRuntimeService : Service(), LifecycleOwner, SavedStateRegist
     @Volatile
     private var activeSession: AgentRuntimeSession? = null
     private val runs = AgentRuntimeRunRegistry<PendingStartRequest, RuntimeRun>()
-
-    private data class PendingStartRequest(
-        val incoming: AgentRuntimeWire.IncomingRunRequest,
-        val replyTo: Messenger?,
-    ) {
-        val subscribers = mutableListOf<Messenger>().apply { replyTo?.let(::add) }
-
-        fun subscribe(target: Messenger?) {
-            if (target != null && subscribers.none { it.binder == target.binder }) subscribers += target
-        }
-    }
-
-    private class RuntimeRun(
-        val request: AgentRuntimeWire.RunRequest,
-        val session: AgentRuntimeSession,
-    ) {
-        var overlayState = AgentOverlayState.Initial
-        var hasExecutedForegroundTool = false
-        var hasInteractionLease = false
-        var revealAfterInteraction = false
-        var foregroundToolStarted = false
-        @Volatile var terminalResult: AgentRuntimeWire.RunResult? = null
-        val supplementsLock = Any()
-        val supplements = mutableListOf<AgentUiHandoffPayload.Supplement>()
-        var nextSupplementIndex = 1
-
-        init {
-            request.handoff?.takeIf { it.source == AgentRuntimeWire.AGENT_UI_HANDOFF_SOURCE }?.let {
-                val payload = AgentUiHandoffPayload.from(it.payload)
-                supplements += payload.supplements
-                nextSupplementIndex = payload.lastSupplementIndex + 1
-            }
-        }
-    }
-
     private var windowManager: WindowManager? = null
     private var glowView: ComposeView? = null
     private var capsuleView: ComposeView? = null
@@ -1647,11 +1612,6 @@ internal class AgentRuntimeService : Service(), LifecycleOwner, SavedStateRegist
         private const val FALLBACK_SCREEN_CORNER_DP = 28
         private const val MAX_ARCHIVED_USER_IMAGE_PREVIEWS = 4
     }
-
-    private data class CompletedRunContext(
-        val request: AgentRuntimeWire.RunRequest,
-        val response: AgentModelClient.ModelResponse.Text,
-    )
 
     private class RuntimeConfigUnavailableException : IllegalStateException()
 }
