@@ -108,7 +108,7 @@ internal object OpenAiChatCompletionsProvider : AgentProviderClient {
             .put("model", config.model)
             .put("stream", true)
             .put("messages", withLeadingUserMessage(OpenAiRequestMessages.forChatCompletions(messages)))
-            .put("tools", tools)
+            .put("tools", chatToolsWithoutTopLevelCombinators(tools))
             .put("tool_choice", "auto")
             .also { request ->
                 if (sourceType != ProviderSourceTypes.OPENROUTER) {
@@ -123,7 +123,7 @@ internal object OpenAiChatCompletionsProvider : AgentProviderClient {
                     request.put("stream", true)
                     request.put("messages", withLeadingUserMessage(OpenAiRequestMessages.forChatCompletions(messages)))
                     if (tools.length() > 0) {
-                        request.put("tools", tools)
+                        request.put("tools", chatToolsWithoutTopLevelCombinators(tools))
                         request.put("tool_choice", "auto")
                     } else {
                         request.remove("tools")

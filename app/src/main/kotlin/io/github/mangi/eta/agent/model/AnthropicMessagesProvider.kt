@@ -13,7 +13,6 @@ internal object AnthropicMessagesProvider : AgentProviderClient {
     private const val DEFAULT_MAX_TOKENS = 4096
     private const val ADAPTIVE_MODEL_DEFAULT_MAX_TOKENS = 16_384
     private val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
-    private val TOP_LEVEL_COMBINATORS = listOf("oneOf", "anyOf", "allOf")
     private const val TRANSIENT_BLOCK = "_eta_transient"
 
     override val id: String = "anthropic_messages"
@@ -278,8 +277,7 @@ internal object AnthropicMessagesProvider : AgentProviderClient {
      */
     private fun inputSchema(parameters: JSONObject?): JSONObject {
         parameters ?: return JSONObject().put("type", "object")
-        if (TOP_LEVEL_COMBINATORS.none(parameters::has)) return parameters
-        return JSONObject(parameters.toString()).apply { TOP_LEVEL_COMBINATORS.forEach(::remove) }
+        return withoutTopLevelCombinators(parameters)
     }
 
     private fun convertImageBlock(item: JSONObject): JSONObject? {
