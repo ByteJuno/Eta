@@ -41,7 +41,6 @@ import androidx.compose.material.icons.rounded.Smartphone
 import androidx.compose.material.icons.rounded.SportsBar
 import androidx.compose.material.icons.rounded.SupportAgent
 import androidx.compose.material.icons.rounded.SwipeUp
-import androidx.compose.material.icons.rounded.SystemUpdate
 import androidx.compose.material.icons.rounded.Terminal
 import androidx.compose.material.icons.rounded.TouchApp
 import androidx.compose.material.icons.rounded.TravelExplore
@@ -72,8 +71,6 @@ import io.github.mangi.eta.config.PowerAssistantTarget
 import io.github.mangi.eta.config.Prefs
 import io.github.mangi.eta.data.repository.ProviderRepository
 import io.github.mangi.eta.data.repository.RuntimeConfigRepository
-import io.github.mangi.eta.data.update.AppLatestRelease
-import io.github.mangi.eta.data.update.AppUpdateChecker
 import io.github.mangi.eta.systemizer.GoogleAppSystemizerInstaller
 import io.github.mangi.eta.systemizer.RootManager
 import io.github.mangi.eta.systemizer.SystemizerInstallResult
@@ -191,40 +188,13 @@ private fun SettingsPageContent(
         }
     }
 
-    // 关于组：版本信息与更新检查。结果对话框在列表外渲染，状态需要页面级 owner。
+    // 关于组：版本信息。fork 使用独立签名，不检查上游 Release，避免提示无法覆盖安装的更新。
     val appPackageInfo = remember {
         context.packageManager.getPackageInfo(context.packageName, 0)
     }
-    val appVersionName = appPackageInfo.versionName.orEmpty()
     val appVersionSummary = "${appPackageInfo.versionName} (${appPackageInfo.longVersionCode})"
     val openUrl: (String) -> Unit = { url ->
         context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
-    }
-    var checkingUpdate by remember { mutableStateOf(false) }
-    var availableUpdate by remember { mutableStateOf<AppLatestRelease?>(null) }
-    val checkForUpdate: () -> Unit = {
-        if (!checkingUpdate) {
-            checkingUpdate = true
-            coroutineScope.launch {
-                val release = runCatching {
-                    withContext(Dispatchers.IO) { AppUpdateChecker.fetchLatest() }
-                }.getOrNull()
-                checkingUpdate = false
-                when {
-                    release == null -> Toast.makeText(
-                        context.applicationContext,
-                        context.getString(R.string.ui_update_check_failed),
-                        Toast.LENGTH_SHORT,
-                    ).show()
-                    AppUpdateChecker.isNewer(release.version, appVersionName) -> availableUpdate = release
-                    else -> Toast.makeText(
-                        context.applicationContext,
-                        context.getString(R.string.ui_update_already_latest),
-                        Toast.LENGTH_SHORT,
-                    ).show()
-                }
-            }
-        }
     }
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
@@ -828,23 +798,6 @@ private fun SettingsPageContent(
                         },
                     )
                     ArrowPreference(
-                        title = stringResource(R.string.ui_about_update_title),
-                        summary = if (checkingUpdate) {
-                            stringResource(R.string.ui_about_update_checking)
-                        } else {
-                            null
-                        },
-                        startAction = {
-                            SettingsIcon(
-                                icon = Icons.Rounded.SystemUpdate,
-                                tint = SettingsIconColors.Green,
-                                enabled = !checkingUpdate,
-                            )
-                        },
-                        enabled = !checkingUpdate,
-                        onClick = checkForUpdate,
-                    )
-                    ArrowPreference(
                         title = stringResource(R.string.ui_about_feedback_title),
                         startAction = {
                             SettingsIcon(
@@ -901,24 +854,6 @@ private fun SettingsPageContent(
                 }
             },
         )
-
-        availableUpdate?.let { update ->
-            WindowDialog(
-                show = true,
-                title = stringResource(R.string.ui_update_available_title),
-                summary = stringResource(R.string.ui_update_available_message, update.version, appVersionName),
-                onDismissRequest = { availableUpdate = null },
-            ) {
-                MiuixDialogActions(
-                    confirmText = stringResource(R.string.ui_update_go_download),
-                    onCancel = { availableUpdate = null },
-                    onConfirm = {
-                        availableUpdate = null
-                        openUrl(update.url)
-                    },
-                )
-            }
-        }
 }
 
 // ── 系统化确认对话框 ─────────────────────────────────────────────────────────

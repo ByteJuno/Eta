@@ -59,11 +59,28 @@ jobs:
       - name: 配置构建环境
         uses: ./.github/actions/setup-build
 
+      # 非发版构建的 versionCode 取提交时间（北京时间）的 yyyyMMdd + 当日 15 分钟时段（00–95）：
+      # 同一提交重复构建结果一致，后续提交单调递增，可直接覆盖安装。
+      - name: 生成构建版本号
+        id: version
+        run: |
+          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
+            exit 0
+          fi
+          commit_time="$(git log -1 --format=%ct HEAD)"
+          day="$(TZ=Asia/Shanghai date -d "@$commit_time" +%Y%m%d)"
+          hour="$(TZ=Asia/Shanghai date -d "@$commit_time" +%H)"
+          minute="$(TZ=Asia/Shanghai date -d "@$commit_time" +%M)"
+          slot=$(( 10#$hour * 4 + 10#$minute / 15 ))
+          printf 'code=%s%02d\n' "$day" "$slot" >> "$GITHUB_OUTPUT"
+
       - name: 构建 Debug APK
+        env:
+          CI_VERSION_CODE: ${{ steps.version.outputs.code }}
         run: |
           metadata_arg=()
           if [[ "$GITHUB_REF_TYPE" != "tag" ]]; then
-            metadata_arg=("-Peta.buildMetadata=${GITHUB_SHA::7}")
+            metadata_arg=("-Peta.buildMetadata=${GITHUB_SHA::7}" "-Peta.versionCode=$CI_VERSION_CODE")
           fi
           ./gradlew --no-daemon --no-configuration-cache "${metadata_arg[@]}" \
             :app:assembleDebug
@@ -112,11 +129,12 @@ jobs:
           ETA_RELEASE_STORE_PASSWORD: ${{ secrets.ETA_RELEASE_STORE_PASSWORD }}
           ETA_RELEASE_KEY_ALIAS: ${{ secrets.ETA_RELEASE_KEY_ALIAS }}
           ETA_RELEASE_KEY_PASSWORD: ${{ secrets.ETA_RELEASE_KEY_PASSWORD }}
+          CI_VERSION_CODE: ${{ steps.version.outputs.code }}
         # 发版标签保持纯净版本名；其余构建追加 +<短提交号>，与已发布版本区分
         run: |
           metadata_arg=()
           if [[ "$GITHUB_REF_TYPE" != "tag" ]]; then
-            metadata_arg=("-Peta.buildMetadata=${GITHUB_SHA::7}")
+            metadata_arg=("-Peta.buildMetadata=${GITHUB_SHA::7}" "-Peta.versionCode=$CI_VERSION_CODE")
           fi
           ./gradlew --no-daemon --no-configuration-cache "${metadata_arg[@]}" \
             :app:assembleRelease

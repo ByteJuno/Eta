@@ -29,6 +29,14 @@ require(buildMetadata == null || buildMetadata.matches(Regex("[0-9A-Za-z.-]+")))
 }
 val buildMetadataSuffix = buildMetadata?.let { "+$it" }.orEmpty()
 
+// CI 对非发版构建传入按提交时间生成的 versionCode（yyyyMMdd + 当日 15 分钟时段），保证后续构建可覆盖安装；
+// 只会抬高、不会低于下方手写的发版值。
+val ciVersionCode = providers.gradleProperty("eta.versionCode").orNull?.takeIf { it.isNotBlank() }?.let {
+    requireNotNull(it.toIntOrNull()?.takeIf { code -> code in 1..2_100_000_000 }) {
+        "eta.versionCode 需要 1–2100000000 的整数"
+    }
+}
+
 android {
     namespace = "io.github.mangi.eta"
     compileSdk = 37
@@ -41,6 +49,7 @@ android {
         // versionCode 规则：yyyyMMdd + 两位当日序号（01 起），发版时随 versionName 一起手动递增。
         versionCode = 2026103102
         versionName = "3.4.0-vscreen.1"
+        ciVersionCode?.let { versionCode = maxOf(requireNotNull(versionCode), it) }
         testInstrumentationRunner = "io.github.mangi.eta.validation.DeviceValidationRunner"
 
         ndk {

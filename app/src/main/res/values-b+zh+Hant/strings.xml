@@ -389,14 +389,7 @@
   <string name="ui_about_github_star_title">原始碼</string>
   <string name="ui_about_github_star_hint">如果 Eta 幫到了你，請在 GitHub 點個 Star，這對我們意義重大</string>
   <string name="ui_about_version_title">版本</string>
-  <string name="ui_about_update_title">檢查更新</string>
-  <string name="ui_about_update_checking">正在檢查…</string>
   <string name="ui_about_feedback_title">問題回饋</string>
-  <string name="ui_update_already_latest">目前已是最新版本</string>
-  <string name="ui_update_check_failed">檢查更新失敗，請稍後重試</string>
-  <string name="ui_update_available_title">發現新版本</string>
-  <string name="ui_update_available_message">最新版本 %1$s，目前版本 %2$s</string>
-  <string name="ui_update_go_download">前往下載</string>
   <string name="ui_click_to_reinstall_dc60de">點選重新安裝</string>
   <string name="ui_environmental_status_5b32a1">環境狀態</string>
   <string name="ui_user_skills_748e7f">使用者安裝</string>
@@ -1394,6 +1387,8 @@
     <string name="automation_run">立即執行</string>
     <string name="automation_cancel">取消執行</string>
     <string name="automation_delete">刪除任務</string>
+    <string name="automation_delete_confirm_title">刪除這個任務？</string>
+    <string name="automation_delete_confirm_message">將刪除「%1$s」及其執行記錄，正在執行的運行會被中止。</string>
     <string name="automation_channel">自動任務</string>
     <string name="automation_monitor_title">正在監控任務觸發器</string>
     <string name="automation_monitor_summary">已啟用的事件任務在此服務執行期間接收本機事件。</string>
