@@ -61,11 +61,21 @@ class AgentNotificationHistoryService : NotificationListenerService() {
                 text = content.text,
                 subText = content.subText,
                 postedAt = sbn.postTime,
+                updatesInPlace = updatesInPlace(sbn.notification),
             )
         }
     }
 
     companion object {
+        /** Long-lived status notifications rewrite one row; messages keep their history. */
+        internal fun updatesInPlace(notification: Notification): Boolean =
+            notification.flags and (Notification.FLAG_ONGOING_EVENT or Notification.FLAG_FOREGROUND_SERVICE) != 0 ||
+                notification.category in setOf(
+                    Notification.CATEGORY_PROGRESS, Notification.CATEGORY_SERVICE,
+                    Notification.CATEGORY_TRANSPORT, Notification.CATEGORY_NAVIGATION,
+                    Notification.CATEGORY_STOPWATCH,
+                )
+
         private val writer = Executors.newSingleThreadExecutor { task ->
             Thread(task, "eta-notification-history").apply { isDaemon = true }
         }
