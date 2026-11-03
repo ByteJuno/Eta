@@ -24,16 +24,13 @@ internal fun AgentRuntimeService.registerTestRun(
 ) {
     val request = runtimeTestRequest(session.runId, conversationId)
     val pending = registerTestPending(request)
-    val runClass = AgentRuntimeService::class.java.declaredClasses.single { it.simpleName == "RuntimeRun" }
-    val run = runClass.declaredConstructors.single().apply { isAccessible = true }.newInstance(request, session)
+    val run = RuntimeRun(request, session)
     check(testRegistry().promote(session.runId, pending, run))
     if (selected) setRuntimeField("activeSession", session)
 }
 
 internal fun AgentRuntimeService.registerTestPending(request: AgentRuntimeWire.RunRequest, replyTo: Messenger? = null): Any {
-    val pendingClass = AgentRuntimeService::class.java.declaredClasses.single { it.simpleName == "PendingStartRequest" }
-    val pending = pendingClass.declaredConstructors.single().apply { isAccessible = true }
-        .newInstance(AgentRuntimeWire.IncomingRunRequest(request, emptyList()), replyTo)
+    val pending = PendingStartRequest(AgentRuntimeWire.IncomingRunRequest(request, emptyList()), replyTo)
     check(testRegistry().reserve(request.runId, request.effectiveModelSessionId, pending) ==
         AgentRuntimeRunRegistry.Admission.ACCEPTED)
     return pending

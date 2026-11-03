@@ -30,12 +30,7 @@ class AgentRuntimeServiceRetentionTest {
                 images = emptyList(),
                 history = listOf(AgentModelClient.ConversationMessage("user", "已完成的历史")),
             )
-            val completedContextClass = AgentRuntimeService::class.java.declaredClasses.single {
-                it.simpleName == "CompletedRunContext"
-            }
-            val completedContext = completedContextClass.declaredConstructors.single().apply {
-                isAccessible = true
-            }.newInstance(request, AgentModelClient.ModelResponse.Text("完成"))
+            val completedContext = CompletedRunContext(request, AgentModelClient.ModelResponse.Text("完成"))
             val retainedContext = AgentRuntimeService::class.java.getDeclaredField("lastCompletedRunContext").apply {
                 isAccessible = true
             }
