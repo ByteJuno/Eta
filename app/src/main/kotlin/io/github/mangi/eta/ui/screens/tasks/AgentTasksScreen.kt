@@ -27,7 +27,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -39,6 +38,7 @@ import io.github.mangi.eta.agent.automation.AgentTaskTools
 import io.github.mangi.eta.data.db.EtaDatabase
 import io.github.mangi.eta.ui.components.MiuixScaffoldPage
 import io.github.mangi.eta.ui.components.StatusSuccess
+import io.github.mangi.eta.ui.components.StatusWarning
 import java.time.DayOfWeek
 import java.time.Instant
 import java.time.OffsetDateTime
@@ -115,7 +115,7 @@ internal fun AgentTasksScreen(onBack: () -> Unit) {
                     text = message,
                     color = MiuixTheme.colorScheme.error,
                     style = MiuixTheme.textStyles.body2,
-                    modifier = Modifier.padding(horizontal = 32.dp).padding(bottom = 16.dp),
+                    modifier = Modifier.padding(horizontal = 28.dp).padding(bottom = 12.dp),
                 )
             }
         }
@@ -127,7 +127,7 @@ internal fun AgentTasksScreen(onBack: () -> Unit) {
                 "completed" -> StatusSuccess
                 "failed", "interrupted" -> colors.error
                 "queued", "running" -> colors.primary
-                "configuration_required" -> Color(0xFFFF7700)
+                "configuration_required" -> StatusWarning
                 else -> colors.onSurfaceVariantSummary
             }
             Card(
@@ -240,7 +240,7 @@ private fun TaskDetail(label: String, value: String) {
 
 @Composable
 private fun TaskActions(onRun: () -> Unit, onCancel: () -> Unit, onDelete: () -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         TextButton(
             text = stringResource(R.string.automation_run),
             onClick = onRun,
@@ -251,7 +251,7 @@ private fun TaskActions(onRun: () -> Unit, onCancel: () -> Unit, onDelete: () ->
         )
         Row(
             modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             TextButton(
                 text = stringResource(R.string.automation_cancel),

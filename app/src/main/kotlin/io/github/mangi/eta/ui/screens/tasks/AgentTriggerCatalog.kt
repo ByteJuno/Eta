@@ -55,7 +55,7 @@ internal fun loadTaskTriggers(context: Context): List<TaskTriggerUi> {
 
 @Composable
 internal fun TriggerCatalogHeading(triggers: List<TaskTriggerUi>) {
-    Column(Modifier.fillMaxWidth().padding(horizontal = 32.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    Column(Modifier.fillMaxWidth().padding(horizontal = 28.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text(stringResource(R.string.automation_triggers_title), style = MiuixTheme.textStyles.body1, color = MiuixTheme.colorScheme.onBackground)
         Text(stringResource(R.string.automation_triggers_count, triggers.count { it.available }, triggers.size),
             style = MiuixTheme.textStyles.footnote1, color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
