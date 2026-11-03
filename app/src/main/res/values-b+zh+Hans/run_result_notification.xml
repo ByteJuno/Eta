@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="run_result_channel">任务结果</string>
+    <string name="run_result_done">Eta 任务已完成</string>
+    <string name="run_result_failed">Eta 任务失败</string>
+    <string name="run_result_stopped">Eta 任务已停止</string>
+    <string name="run_result_paused">Eta 任务已暂停，需要你处理</string>
+    <string name="run_result_open_hint">点击在 Eta 中查看结果</string>
+</resources>

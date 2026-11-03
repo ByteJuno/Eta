@@ -153,6 +153,7 @@ internal class AgentRuntimeService : Service(), LifecycleOwner, SavedStateRegist
     private var resultArchive: Pair<String, String>? = null
     @Volatile
     private var lastCompletedRunContext: CompletedRunContext? = null
+    private var lastResultNotificationRunId: String? = null
     private val hideToken = Any()
 
     override fun onCreate() {
@@ -678,14 +679,28 @@ internal class AgentRuntimeService : Service(), LifecycleOwner, SavedStateRegist
             runs.removeActive(session.runId, run)
             val selected = activeSession === session
             updateKeepScreenOn()
-            if (!selected) return@post
-            if (selectNextRun()) return@post
+            if (!selected) {
+                notifyRunResult(session.runId, result, run.request, cardWillShow = false)
+                return@post
+            }
+            if (selectNextRun()) {
+                // Another run now owns the overlay; this result would otherwise vanish.
+                notifyRunResult(session.runId, result, run.request, cardWillShow = false)
+                return@post
+            }
             lastCompletedRunContext = completedContext
             val showVirtualResult = AgentTerminalResultPolicy.showVirtualResult(
                 virtualUiRouted = session.virtualUiRouted.get(),
                 automation = resultArchive?.first == "automation",
                 stopped = result.error == "已停止",
                 paused = result.errorCode == "UI_EXECUTION_PAUSED",
+            )
+            val cardRequested = hasExecutedForegroundTool ||
+                entrySurfaceGuard?.wasTriggered == true || showVirtualResult
+            notifyRunResult(
+                session.runId, result, run.request,
+                cardWillShow = cardRequested && RunResultNotification.userCanSeeOverlay(this) &&
+                    (AgentAccessibilityService.current() != null || Settings.canDrawOverlays(this)),
             )
             runCatching {
                 if (result.ok) {
@@ -719,6 +734,48 @@ internal class AgentRuntimeService : Service(), LifecycleOwner, SavedStateRegist
                 }
             }
         }
+    }
+
+    /**
+     * The overlay result card is transient: it cannot be drawn while the screen is off or the
+     * keyguard is up, it auto-dismisses, and it is skipped for runs that are not displayed.
+     * Post a durable notification so a background run never finishes silently. When the card
+     * is going to be shown on an unlocked screen the notification stays silent to avoid a
+     * duplicate alert. Visible Eta already shows the conversation, so nothing is posted.
+     */
+    private fun notifyRunResult(
+        runId: String,
+        result: AgentRuntimeWire.RunResult,
+        request: AgentRuntimeWire.RunRequest,
+        cardWillShow: Boolean,
+    ) {
+        if (EtaMainVisibility.visible) return
+        val handoff = request.handoff
+        // Automation jobs report through their own channel.
+        if (handoff?.source == "automation") return
+        val outcome = when {
+            result.ok -> RunResultNotification.Outcome.SUCCESS
+            result.errorCode == "UI_EXECUTION_PAUSED" -> RunResultNotification.Outcome.PAUSED
+            result.error == "已停止" -> return // The user stopped it themselves.
+            else -> RunResultNotification.Outcome.FAILED
+        }
+        val conversationId = handoff
+            ?.takeIf { it.source == AgentRuntimeWire.AGENT_UI_HANDOFF_SOURCE }
+            ?.let { AgentUiHandoffPayload.from(it.payload).conversationId }
+            ?.takeIf(String::isNotBlank)
+        val archive = handoff
+            ?.takeIf { it.source != AgentRuntimeWire.AGENT_UI_HANDOFF_SOURCE }
+            ?.let { h -> AgentExternalArchivePayload.from(h.payload)?.conversationKey?.takeIf(String::isNotBlank)?.let { h.source to it } }
+        lastResultNotificationRunId = runId
+        RunResultNotification.show(
+            context = this,
+            runId = runId,
+            outcome = outcome,
+            detail = if (result.ok) result.content else result.error.orEmpty(),
+            conversationId = conversationId,
+            archive = archive,
+            silent = cardWillShow,
+        )
     }
 
     private fun sendEventTo(
@@ -1324,6 +1381,7 @@ internal class AgentRuntimeService : Service(), LifecycleOwner, SavedStateRegist
             AndroidAgentLogger.warn("Agent runtime result open failed: type=${launched.exceptionOrNull()?.safeLogType()}")
             return
         }
+        lastResultNotificationRunId?.let { RunResultNotification.cancel(this, it) }
         dismissAndStop()
     }
 
