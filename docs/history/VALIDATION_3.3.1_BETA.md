@@ -44,9 +44,9 @@ Release 版本 `3.3.1-beta.1`，版本码 `2026101001`，沿用 Eta-vivo 发布�
 
 | 通知中心 | 方案详情 | 默认提示词 |
 | --- | --- | --- |
-| ![通知中心](images/3.3.1-beta/notification-center.png) | ![方案详情](images/3.3.1-beta/learning-proposal-detail.png) | ![默认提示词](images/3.3.1-beta/default-system-prompt.png) |
+| ![通知中心](../images/3.3.1-beta/notification-center.png) | ![方案详情](../images/3.3.1-beta/learning-proposal-detail.png) | ![默认提示词](../images/3.3.1-beta/default-system-prompt.png) |
 
-![执行中插话与停止](images/3.3.1-beta/chat-interjection.png)
+![执行中插话与停止](../images/3.3.1-beta/chat-interjection.png)
 
 
 旧显示引擎相关说明已移除；当前规则见 [后台虚拟屏](VIRTUAL_SCREEN.md)。
