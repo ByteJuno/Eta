@@ -22,6 +22,37 @@ import org.junit.Test
 
 class AnthropicMessagesProviderTest {
     @Test
+    fun leadingAssistantSummaryGetsPlaceholderUserTurn() {
+        val requestBody = AtomicReference<String>()
+        withAnthropicServer(event("message_stop", JSONObject()), onRequest = requestBody::set) { baseUrl ->
+            val fixture = providerRequest(baseUrl)
+            AnthropicMessagesProvider.complete(
+                fixture.copy(messages = JSONArray()
+                    .put(JSONObject().put("role", "system").put("content", "规则"))
+                    .put(JSONObject().put("role", "assistant").put("content", "[Eta 上下文摘要]").put("_eta_context_summary", true))
+                    .put(JSONObject().put("role", "user").put("content", "继续回答"))),
+                AgentRunController(),
+            )
+        }
+        val messages = JSONObject(requestBody.get()).getJSONArray("messages")
+        assertEquals("user", messages.getJSONObject(0).getString("role"))
+        assertEquals(LEADING_USER_PLACEHOLDER, messages.getJSONObject(0).getJSONArray("content").getJSONObject(0).getString("text"))
+        assertEquals("assistant", messages.getJSONObject(1).getString("role"))
+        assertEquals("user", messages.getJSONObject(2).getString("role"))
+    }
+
+    @Test
+    fun conversationStartingWithUserIsNotPadded() {
+        val requestBody = AtomicReference<String>()
+        withAnthropicServer(event("message_stop", JSONObject()), onRequest = requestBody::set) { baseUrl ->
+            AnthropicMessagesProvider.complete(providerRequest(baseUrl), AgentRunController())
+        }
+        val messages = JSONObject(requestBody.get()).getJSONArray("messages")
+        assertEquals(1, messages.length())
+        assertFalse(messages.toString().contains(LEADING_USER_PLACEHOLDER))
+    }
+
+    @Test
     fun newAdaptiveModelsHaveRoomForThinkingAndExplicitMaxTokensWins() {
         val body = event("message_stop", JSONObject())
         val cases = listOf(

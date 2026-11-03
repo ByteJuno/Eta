@@ -129,11 +129,21 @@ internal object AnthropicMessagesProvider : AgentProviderClient {
             }
         }
 
+        // 压缩摘要、角色开场白是 assistant：Messages API 要求第一条是 user，补固定占位（见 LEADING_USER_PLACEHOLDER）
+        val requestMessages = if (anthropicMessages.optJSONObject(0)?.optString("role") == "assistant") {
+            JSONArray().also { out ->
+                out.put(JSONObject().put("role", "user").put("content", JSONArray().put(
+                    JSONObject().put("type", "text").put("text", LEADING_USER_PLACEHOLDER),
+                )))
+                for (index in 0 until anthropicMessages.length()) out.put(anthropicMessages.get(index))
+            }
+        } else anthropicMessages
+
         return JSONObject()
             .put("model", config.model)
             .put("max_tokens", defaultMaxTokens(config.model))
             .put("stream", true)
-            .put("messages", anthropicMessages)
+            .put("messages", requestMessages)
             .also { request ->
                 val system = systemParts.joinToString("\n\n").trim()
                 if (system.isNotBlank()) {
@@ -143,7 +153,7 @@ internal object AnthropicMessagesProvider : AgentProviderClient {
                     converted.optJSONObject(converted.length() - 1)?.let(::cacheBreakpoint)
                     request.put("tools", converted)
                 }
-                markConversationBreakpoint(anthropicMessages)
+                markConversationBreakpoint(requestMessages)
                 RequestBodyMerge.mergeCustomBody(request, config.customBody)
                 val explicitMaxTokens = request.opt("max_tokens")
                     .takeIf { config.customBody.any { body -> body.key == "max_tokens" } }

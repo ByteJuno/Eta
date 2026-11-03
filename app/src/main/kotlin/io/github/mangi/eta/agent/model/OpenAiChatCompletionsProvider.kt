@@ -107,7 +107,7 @@ internal object OpenAiChatCompletionsProvider : AgentProviderClient {
         return JSONObject()
             .put("model", config.model)
             .put("stream", true)
-            .put("messages", OpenAiRequestMessages.forChatCompletions(messages))
+            .put("messages", withLeadingUserMessage(OpenAiRequestMessages.forChatCompletions(messages)))
             .put("tools", tools)
             .put("tool_choice", "auto")
             .also { request ->
@@ -121,7 +121,7 @@ internal object OpenAiChatCompletionsProvider : AgentProviderClient {
                     // 代理按请求头路由模型，正文必须与同一配置一致，并保持订阅所需的流式调用。
                     request.put("model", config.model)
                     request.put("stream", true)
-                    request.put("messages", OpenAiRequestMessages.forChatCompletions(messages))
+                    request.put("messages", withLeadingUserMessage(OpenAiRequestMessages.forChatCompletions(messages)))
                     if (tools.length() > 0) {
                         request.put("tools", tools)
                         request.put("tool_choice", "auto")
