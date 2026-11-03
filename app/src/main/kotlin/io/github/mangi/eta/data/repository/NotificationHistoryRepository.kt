@@ -114,7 +114,7 @@ internal class NotificationHistoryRepository(context: Context) {
     private companion object {
         const val DATABASE_NAME = "eta_notification_history.db"
         const val TABLE = "notification_history"
-        const val MAX_RECORDS = 1_000
+        const val MAX_RECORDS = 4_000
         const val RETENTION_DAYS = 7
         const val HOUR_MS = 60L * 60 * 1_000
         const val RETENTION_MS = RETENTION_DAYS * 24L * HOUR_MS
