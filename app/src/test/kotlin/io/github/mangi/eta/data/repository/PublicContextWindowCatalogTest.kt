@@ -9,7 +9,11 @@ import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
 
+// The failure path logs through android.util.Log, which needs Robolectric on the JVM.
+@RunWith(RobolectricTestRunner::class)
 class PublicContextWindowCatalogTest {
     private val index = PublicContextWindowCatalog.parseIndex(
         """
