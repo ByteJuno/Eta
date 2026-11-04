@@ -910,6 +910,8 @@
   <string name="settings_write_failed">配置写入失败</string>
   <string name="status_processing">处理中…</string>
   <string name="power_assistant_system_default">系统默认助手</string>
+  <string name="settings_power_eta_open_main">直接打开 Eta 主页面</string>
+  <string name="settings_power_eta_open_main_summary">长按电源键直接进入 Eta 主界面，不弹出语音浮窗</string>
   <string name="systemizer_already_system">Google App 已是系统 priv-app</string>
   <string name="systemizer_google_missing">未安装 Google App</string>
   <string name="systemizer_root_manager_missing">未检测到 Magisk 或 KernelSU</string>

@@ -919,6 +919,8 @@
   <string name="settings_write_failed">Couldn\'t save settings</string>
   <string name="status_processing">Processing…</string>
   <string name="power_assistant_system_default">System default assistant</string>
+  <string name="settings_power_eta_open_main">Open Eta home directly</string>
+  <string name="settings_power_eta_open_main_summary">A long press opens the Eta main screen instead of the voice overlay</string>
   <string name="systemizer_already_system">Google App is already a system priv-app</string>
   <string name="systemizer_google_missing">Google App is not installed</string>
   <string name="systemizer_root_manager_missing">Magisk or KernelSU was not detected</string>

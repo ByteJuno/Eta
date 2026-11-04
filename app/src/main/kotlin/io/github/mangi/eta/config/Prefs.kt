@@ -32,6 +32,8 @@ internal object Prefs {
         const val POWER_KEY_ASSISTANT_TARGET = "power_key_assistant_target"
         // 兼容旧版布尔协议；新 UI 不再写入，缺少三态配置时 true 仍表示 Gemini。
         const val POWER_KEY_TAKEOVER = "power_key_takeover"
+        // 目标为 Eta 时直接打开主页面；默认关闭，保持原有浮窗唤醒。
+        const val POWER_KEY_ETA_OPEN_MAIN = "power_key_eta_open_main"
         const val ASSISTANT_AUTO_CONFIG = "assistant_auto_config"
         const val HOTWORD_SELF_HEAL = "hotword_self_heal"
         const val GESTURE_BAR_CIRCLE_TO_SEARCH = "gesture_bar_circle_to_search"
@@ -54,6 +56,7 @@ internal object Prefs {
         /** 全部布尔开关及其默认值。 */
         val BOOLEAN_DEFAULTS: Map<String, Boolean> = mapOf(
             POWER_KEY_TAKEOVER to false,
+            POWER_KEY_ETA_OPEN_MAIN to false,
             ASSISTANT_AUTO_CONFIG to false,
             HOTWORD_SELF_HEAL to false,
             GESTURE_BAR_CIRCLE_TO_SEARCH to true,

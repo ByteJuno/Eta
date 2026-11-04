@@ -95,7 +95,7 @@ Automatic compaction needs the model's context window in tokens, set under Setti
 Eta implements Android's native digital assistant service (`VoiceInteractionService`) and works as a full system assistant app, letting you wake Eta directly from the power button to run tasks:
 
 - **Eta native digital assistant:** wake Eta's own global overlay directly from the power button, with edge glow, voice or keyboard input, prompt suggestions, and a pull-up gesture to jump straight into the main Eta chat; waking the assistant automatically attaches the current screenshot and app content via the system assist pipeline without extra taps or accessibility screenshot permissions. Speech recognition supports Qwen or Doubao online APIs (or can be disabled to open the text composer and keyboard directly), and speech synthesis supports Qwen, Doubao, Gemini, and MiniMax with assistant auto-read and background/lock-screen chat playback.
-- **Power-button routing:** choose whether a long press on the power button wakes Eta, Gemini, or the default OEM assistant.
+- **Power-button routing:** choose whether a long press on the power button wakes Eta, Gemini, or the default OEM assistant; when Eta is the target, it can also open the Eta main screen directly.
 - **Breeno / Super XiaoAI integration:** if you prefer the OEM assistant UI, keep its entry point and route requests to Eta and your configured model.
 
 On ROMs that lock down the default assistant or power-button behavior, power-button routing and OEM assistant integration require LSPosed and a supported system.

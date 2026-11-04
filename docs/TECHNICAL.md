@@ -51,7 +51,7 @@ GUI、Root、数字助理与内置浏览器的模型截图保持原尺寸与像�
 
 ## system_server
 
-- **电源键接管**：Hook `PhoneWindowManagerExtImpl$OplusSpeechHandler.handleMessage()` 处理系统分发给小布的唤醒消息（`what == 0x3F3`）。目标为小布时直接执行原方法；目标为 Gemini 或 Eta 时才拦截并分发到对应入口。
+- **电源键接管**：Hook `PhoneWindowManagerExtImpl$OplusSpeechHandler.handleMessage()` 处理系统分发给小布的唤醒消息（`what == 0x3F3`）。目标为小布时直接执行原方法；目标为 Gemini 或 Eta 时才拦截并分发到对应入口。目标为 Eta 时默认唤起助理浮窗；设置页可选「直接打开 Eta 主页面」，开启后改为显式启动 `MainActivity`（`MAIN`/`LAUNCHER`，`NEW_TASK|CLEAR_TOP|SINGLE_TOP`），按当前 Android 用户启动；启动失败直接回退小布原逻辑，不触发浮窗兜底或默认助理后台修复，也不绕过锁屏。
 - **兼容配置**：三态目标写入字符串键；键不存在或值非法时读取旧 `POWER_KEY_TAKEOVER` 布尔协议，`true` 继续表示 Gemini，`false` 表示小布。新安装默认保持小布，旧用户不会因新增 Eta 被改写目标。
 - **数字助理配置修复**：独立自动设置开关开启后，开机、解锁、切用户及启动失败恢复时，通过 `AssistantManager` 异步校正当前 Gemini/Eta 目标的 `android.app.role.ASSISTANT` 与 secure settings。小布模式和开关关闭时不写系统配置；校验缓存及异步回调同时核对用户与目标，旧目标任务不会继续覆盖新选择。
 - **唤起逻辑优化**：Gemini 恢复原有 `VoiceInteractionManagerService`、`ACTION_ASSIST`、`ACTION_VOICE_COMMAND` 顺序；Eta 优先使用活动 `voiceinteraction` 会话，再在已经配置为默认助理时尝试同包 `ACTION_ASSIST` 桥。所有路径失败后立即执行小布原逻辑，不阻塞系统回调。
@@ -282,7 +282,7 @@ Provider 按请求前缀复用缓存，前缀任一字节变化都会让其后�
 
 ## 预期行为
 
-电源键目标为 Gemini 时，长按恢复 Google 原有系统助手与 Activity 兜底链路。目标为 Eta 且 Eta 已是默认数字助理时，长按会打开 edge-to-edge 全屏助理浮窗并优先开始单次语音输入，可切换键盘；系统在唤醒时采集截图、前台应用和页面内容，Session 异步接收后由浮窗自动随提问发送，不再显示手动添加屏幕按钮，也不依赖无障碍截图。用户提交文本后，工具执行、流式结果和归档仍由主进程中的 Agent Runtime 负责，语音识别由统一会话控制器调用千问或豆包云端接口。助手浮窗可自动播报语音提问的最终回答；开始录音、窗口隐藏或关闭时停止播放，不在后台补播。聊天听写先插入可编辑草稿，历史回答可手动朗读。配置、协议与生命周期边界见[语音配置与实现](VOICE.md)。
+电源键目标为 Gemini 时，长按恢复 Google 原有系统助手与 Activity 兜底链路。目标为 Eta 且 Eta 已是默认数字助理时，长按会打开 edge-to-edge 全屏助理浮窗并优先开始单次语音输入，可切换键盘；系统在唤醒时采集截图、前台应用和页面内容，Session 异步接收后由浮窗自动随提问发送，不再显示手动添加屏幕按钮，也不依赖无障碍截图。用户提交文本后，工具执行、流式结果和归档仍由主进程中的 Agent Runtime 负责，语音识别由统一会话控制器调用千问或豆包云端接口。助手浮窗可自动播报语音提问的最终回答；开始录音、窗口隐藏或关闭时停止播放，不在后台补播。聊天听写先插入可编辑草稿，历史回答可手动朗读。配置、协议与生命周期边界见[语音配置与实现](VOICE.md)。开启「直接打开 Eta 主页面」后，长按改为按当前用户显式启动主界面，不创建浮窗；启动失败直接回退小布原逻辑。
 
 Eta 尚未成为默认助理且自动设置关闭时，按既定策略直接回到小布，不创建平行 Activity 会话。自动设置开启时，失败触发只在后台修复当前选择，当前长按仍立即回退；后续触发使用修复后的主路径。HyperOS 后续只需把厂商按键事件接到同一目标分发边界，不需要修改文本会话和 Runtime。
 

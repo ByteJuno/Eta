@@ -234,6 +234,24 @@ internal object PowerHooks {
             return LaunchResult.LAUNCHED
         }
 
+        // 目标为 Eta 且开关开启时直接进入主页面，不经过 voiceinteraction；
+        // 失败只回退 OEM 原逻辑，不触发浮窗兜底或后台助理配置修复。
+        if (EtaPowerMainActivity.shouldOpenMain(
+                target = target,
+                openMainEnabled = Prefs.isEnabled(Prefs.Keys.POWER_KEY_ETA_OPEN_MAIN)
+            )
+        ) {
+            if (!EtaPowerMainActivity.launch(context)) {
+                logger.warnThrottled("${source}_eta_main_failed") {
+                    "$source: 打开 Eta 主页面失败，回退原逻辑"
+                }
+                return LaunchResult.NOT_HANDLED
+            }
+            finalizeSuccessfulLaunch(logger, phoneWindowManager, source, now)
+            logger.debug { "$source: 已直接打开 Eta 主页面" }
+            return LaunchResult.LAUNCHED
+        }
+
         if (AssistantManager.showAssistantSession(
                 context = context,
                 target = target,
