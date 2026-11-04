@@ -116,6 +116,8 @@ class AgentConversationStoreTest {
                     command = "pm list packages | head",
                     resultSummary = "ok=true, chars=100",
                     imageCount = 1,
+                    // 工具耗时复用 request_duration_ms 列，往返后必须保持一致。
+                    durationMs = 1_480L,
                 ),
                 AgentMessageUi(
                     id = "assistant-1",

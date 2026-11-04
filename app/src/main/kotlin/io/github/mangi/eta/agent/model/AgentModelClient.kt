@@ -403,6 +403,13 @@ internal object AgentModelClient {
         /** Set only by the loop when a call was rejected before invoking its executor. */
         val executionSkipped: Boolean = false,
         val command: String? = null,
+        /**
+         * 执行器自身的精确耗时（毫秒），只由 loop 在调用前后用 [System.nanoTime] 计时写入。
+         *
+         * 并行批次里每个 worker 各自计时，因此不受按序 `future.get()` 的排队等待影响；
+         * 未执行（跳过、拒收、参数校验失败）的调用保持 null，不用估算值伪造耗时。
+         */
+        val durationMs: Long? = null,
     )
 
     data class ToolStop(val code: String, val message: String) {

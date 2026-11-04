@@ -13,6 +13,8 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -478,6 +480,46 @@ class AgentBatchToolTest {
         assertEquals(0, executed.get())
         assertFalse(provider.requests.first().tools.objects().any { it.getJSONObject("function").getString("name") == "batch" })
         assertEquals("TOOL_NOT_AVAILABLE", provider.toolResult().getString("code"))
+    }
+
+    @Test
+    fun parallelCallsReportTheirOwnExecutorWindowInsteadOfOrderedQueueWait() {
+        val events = mutableListOf<AgentEvent>()
+        val provider = ScriptedProvider(callsResponse(listOf(
+            tool("slow", "search_apps", """{"query":"slow"}"""),
+            tool("fast", "search_apps", """{"query":"fast"}"""),
+        )))
+        val bothStarted = CountDownLatch(2)
+        AgentModelClient.complete(config(), "查询", AgentModelClient.ToolExecutor { call ->
+            bothStarted.countDown()
+            assertTrue("两个查询必须并行启动", bothStarted.await(5, TimeUnit.SECONDS))
+            if (call.id == "slow") Thread.sleep(400)
+            AgentModelClient.ToolResult("{\"ok\":true}")
+        }, provider = provider, onEvent = events::add)
+        val finished = events.filterIsInstance<AgentEvent.ToolFinished>().associateBy { it.toolCallId }
+        val slow = requireNotNull(finished.getValue("slow").durationMs)
+        val fast = requireNotNull(finished.getValue("fast").durationMs)
+        assertTrue("慢调用记录自身执行耗时：$slow", slow >= 350)
+        // 若按顺序 future.get() 的墙钟计时，快调用会连慢调用的等待一起算成自己的耗时。
+        assertTrue("快调用不应继承排队等待：$fast（慢调用 $slow）", fast < 300)
+    }
+
+    @Test
+    fun batchShellIsTimedWhileSkippedSubcallsReportNoDuration() {
+        val controller = AgentRunController()
+        val events = mutableListOf<AgentEvent>()
+        val provider = ScriptedProvider(wrapper(listOf(write("first"), write("second")), "sequential", "continue"))
+        AgentModelClient.complete(config().copy(terminalTools = true), "执行", AgentModelClient.ToolExecutor {
+            controller.steer("停止写入，改为回答")
+            AgentModelClient.ToolResult("{\"ok\":true}")
+        }, provider = provider, runController = controller, onEvent = events::add)
+        val finished = events.filterIsInstance<AgentEvent.ToolFinished>()
+        assertNotNull(finished.single { it.name == "batch" }.durationMs)
+        val subcalls = finished.filter { it.name == "write_file" }
+        assertEquals(2, subcalls.size)
+        assertNotNull(subcalls.first().durationMs)
+        // 未执行的子调用没有执行窗口，不能伪造耗时。
+        assertNull(subcalls.last().durationMs)
     }
 
     private val loopThread = Thread.currentThread()

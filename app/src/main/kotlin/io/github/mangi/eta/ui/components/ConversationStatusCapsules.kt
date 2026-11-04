@@ -1,5 +1,11 @@
 package io.github.mangi.eta.ui.components
 
+import androidx.compose.foundation.clickable
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import top.yukonga.miuix.kmp.window.WindowDialog
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
@@ -37,16 +43,38 @@ internal fun ConversationStatusCapsules(messages: List<AgentChatMessageUi>, mode
     }
     val contextText = count + (limit?.let { "/$it" } ?: "") + (percent?.let { " · $it" } ?: "")
     val contextDescription = stringResource(R.string.conversation_context_capsule) + " " + contextText
-    val speed = (lastUsage ?: messages.asReversed().filterIsInstance<AgentMessageUi>()
-        .firstOrNull { it.usage != null }?.usage)?.averageTokensPerSecond
+    val latestUsage = lastUsage ?: messages.asReversed().filterIsInstance<AgentMessageUi>()
+        .firstOrNull { it.usage != null }?.usage
+    var showUsage by remember { mutableStateOf(false) }
+    val speed = latestUsage?.averageTokensPerSecond
     val speedText = speed?.let {
         NumberFormat.getNumberInstance().apply { maximumFractionDigits = 1 }.format(it)
     } ?: "—"
     Row(Modifier.widthIn(max = 232.dp).padding(horizontal = 4.dp),
         horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-        StatusCapsule(contextText, Modifier.weight(1f, fill = false), contextDescription)
+        StatusCapsule(contextText, Modifier.weight(1f, fill = false).clickable { showUsage = true }, contextDescription)
         StatusCapsule("$speedText tok/s", Modifier, stringResource(R.string.conversation_speed_description, speedText))
     }
+    if (showUsage) {
+        WindowDialog(show = true, title = stringResource(R.string.usage_details_title), onDismissRequest = { showUsage = false }) {
+            val unknown = stringResource(R.string.usage_not_reported)
+            val input = latestUsage?.inputTokens
+            val cache = latestUsage?.cachedTokens
+            Text(stringResource(R.string.usage_input_label) + ": " + (input?.toString() ?: unknown))
+            Text(stringResource(R.string.usage_output_label) + ": " + (latestUsage?.outputTokens?.toString() ?: unknown))
+            Text(stringResource(R.string.usage_cache_label) + ": " + cacheUsageDetail(input, cache, unknown))
+            if (cache == null) Text(stringResource(R.string.usage_cache_unknown_hint))
+        }
+    }
+}
+
+/** A missing provider field is unknown, never a measured zero or a cache miss. */
+internal fun cacheUsageDetail(input: Int?, cached: Int?, unknown: String): String {
+    if (cached == null) return unknown
+    val ratio = input?.takeIf { it > 0 && cached in 0..it }?.let {
+        NumberFormat.getPercentInstance().apply { maximumFractionDigits = 1 }.format(cached.toDouble() / it)
+    }
+    return cached.toString() + (ratio?.let { " ($it)" } ?: "")
 }
 
 @Composable

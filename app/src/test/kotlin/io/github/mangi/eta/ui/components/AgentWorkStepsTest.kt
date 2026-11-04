@@ -11,6 +11,18 @@ import org.junit.Test
 class AgentWorkStepsTest {
 
     @Test
+    fun toolDurationLabelStaysShortAndUnmeasuredCallsShowNothing() {
+        assertNull(toolDurationLabel(null))
+        assertNull(toolDurationLabel(0L))
+        assertNull(toolDurationLabel(-1L))
+        assertEquals("840ms", toolDurationLabel(840L))
+        assertEquals("1.4s", toolDurationLabel(1_480L))
+        assertEquals("12s", toolDurationLabel(12_700L))
+        assertEquals("2m5s", toolDurationLabel(125_400L))
+        assertEquals("3m", toolDurationLabel(180_000L))
+    }
+
+    @Test
     fun consecutiveSameToolCallsFormOneGroup() {
         val steps = listOf(
             tool("t1", "read_file"),

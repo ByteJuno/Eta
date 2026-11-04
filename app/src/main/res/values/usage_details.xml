@@ -1,0 +1,8 @@
+<resources>
+    <string name="usage_details_title">Request usage</string>
+    <string name="usage_input_label">Input tokens</string>
+    <string name="usage_output_label">Output tokens</string>
+    <string name="usage_cache_label">Cached input tokens</string>
+    <string name="usage_not_reported">Not reported</string>
+    <string name="usage_cache_unknown_hint">The provider omitted cache usage. This does not mean zero cache hits or prove full-price billing.</string>
+</resources>

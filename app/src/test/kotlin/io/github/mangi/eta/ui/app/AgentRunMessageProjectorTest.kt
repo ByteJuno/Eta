@@ -12,11 +12,58 @@ import io.github.mangi.eta.ui.model.ToolActivityStatusUi
 import io.github.mangi.eta.ui.model.UserMessageUi
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class AgentRunMessageProjectorTest {
+    @Test
+    fun toolDurationFlowsFromFinishedEventAndMissingTimingStaysUnknown() {
+        val projector = AgentRunMessageProjector { 1_000L }
+        val runId = "run"
+        var messages: List<AgentChatMessageUi> = projector.startTool(
+            runId,
+            AgentEvent.ToolStarted(
+                round = 1,
+                toolCallId = "call-1",
+                name = "read_file",
+                argsPreview = "note.md",
+            ),
+            emptyList(),
+        )
+        messages = projector.finishTool(
+            runId,
+            AgentEvent.ToolFinished(
+                round = 1,
+                toolCallId = "call-1",
+                name = "read_file",
+                resultSummary = "ok=true",
+                imageCount = 0,
+                imageBytes = 0,
+                success = true,
+                durationMs = 1_480L,
+            ),
+            messages,
+        )
+        assertEquals(1_480L, messages.filterIsInstance<ToolActivityMessageUi>().single().durationMs)
+
+        // 旧版本 Runtime 的事件没有 durationMs：保持 null，界面不显示耗时。
+        val legacy = projector.finishTool(
+            runId,
+            AgentEvent.ToolFinished(
+                round = 1,
+                toolCallId = "call-1",
+                name = "read_file",
+                resultSummary = "ok=true",
+                imageCount = 0,
+                imageBytes = 0,
+            ),
+            messages,
+        )
+        assertNull(legacy.filterIsInstance<ToolActivityMessageUi>().single().durationMs)
+    }
+
     @Test
     fun modelInterjectionRemovesOnlyUncommittedRoundAndPreservesCompletedWorkAndSupplement() {
         val projector = AgentRunMessageProjector { 1_000L }

@@ -487,6 +487,8 @@ internal class AgentLoop(
                 progress.getJSONObject(calls.indexOfFirst { it.id == call.id }).put("status", status)
                 publishTranscript(force = true)
             }
+            // 外壳自身只是编排；只对实际执行窗口计时，子调用各自的耗时由 invokeTool 记录。
+            val batchStartedAt = System.nanoTime()
             val (outcomes, stop) = executeOrderedTools(round, calls,
                 parallel = !sequential && !stopOnError,
                 stopOnError = stopOnError,
@@ -502,6 +504,7 @@ internal class AgentLoop(
                     updateProgress(outcome.call, status)
                 },
             )
+            val batchDurationMs = elapsedMillisSince(batchStartedAt)
             checkpoint.remove("code")
             checkpoint.put("ok", stop == null && outcomes.all { traceFormatter.isSuccessResult(it.result) })
                 .put("message", "以下仅保留每项执行状态；completed 项已执行，不要重复。原始参数与结果仅供当前回合使用，未写入持久会话。")
@@ -523,6 +526,7 @@ internal class AgentLoop(
                 sensitive = true,
                 images = outcomes.flatMap { it.result.images },
                 stop = stop,
+                durationMs = batchDurationMs,
             ))
         }
         emitToolStarted(round, toolCall)
@@ -536,8 +540,11 @@ internal class AgentLoop(
                 .put("message", "用户已插话调整指令；此项未执行，按新指令重新规划。")
                 .toString(), executionSkipped = true,
         )
+        // 计时只包住执行器自身：并行批次里各 worker 各自测量，
+        // 不被按序 future.get() 的排队等待污染成墙钟耗时。
+        val startedAt = System.nanoTime()
         return try {
-            toolExecutor.execute(toolCall)
+            toolExecutor.execute(toolCall).copy(durationMs = elapsedMillisSince(startedAt))
         } catch (cancelled: AgentRunCancelledException) {
             throw cancelled
         } catch (throwable: Exception) {
@@ -546,9 +553,13 @@ internal class AgentLoop(
                 .put("ok", false)
                 .put("code", "TOOL_ERROR")
                 .put("message", throwable.message ?: throwable.javaClass.simpleName)
-                .toString())
+                .toString(), durationMs = elapsedMillisSince(startedAt))
         }
     }
+
+    /** 亚毫秒按 1ms 记，与 requestDurationMs 的取整约定一致；跳过项不调用这里。 */
+    private fun elapsedMillisSince(startedAtNanos: Long): Long =
+        ((System.nanoTime() - startedAtNanos) / 1_000_000).coerceAtLeast(1)
 
     private fun finishTool(
         round: Int,
@@ -603,6 +614,8 @@ internal class AgentLoop(
                 imageBytes = result.images.sumOf { it.bytes },
                 success = traceFormatter.isSuccessResult(result),
                 command = result.command,
+                // 跳过与拒收的调用没有执行窗口，保持 null，界面不显示耗时。
+                durationMs = result.durationMs,
             )
         )
     }

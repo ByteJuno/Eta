@@ -803,6 +803,8 @@ internal object AgentRuntimeWire {
                 putInt("image_bytes", event.imageBytes)
                 event.success?.let { putBoolean("success", it) }
                 event.command?.let { putString("command", it.boundedText(MAX_DRAIN_CONTENT_CHARS)) }
+                // 旧客户端不认识这个 key，缺省即无耗时；新客户端读旧事件时为 null。
+                event.durationMs?.takeIf { it > 0 }?.let { putLong("duration_ms", it) }
             }
 
             is AgentEvent.SubagentProgress -> {
@@ -966,6 +968,8 @@ internal object AgentRuntimeWire {
             // 旧版本 Runtime 不发送 success，缺省为 null 由消费端回退判断
             success = if (bundle.containsKey("success")) bundle.getBoolean("success") else null,
             command = bundle.getString("command"),
+            // 旧版本 Runtime 不发送 duration_ms，缺省为 null，界面不显示耗时
+            durationMs = bundle.optionalLong("duration_ms"),
         )
 
         "subagent_progress" -> AgentEvent.SubagentProgress(
@@ -1010,6 +1014,14 @@ internal object AgentRuntimeWire {
 
     private fun Bundle.optionalInt(key: String): Int? =
         if (containsKey(key)) getInt(key) else null
+
+    /**
+     * 兼容 JSON 往返：归档事件重新解析后小整数会变成 [Integer]，因此按 [Number] 读取。
+     * 非正数与缺失一样视为“没有耗时”，旧版本 Runtime 的 bundle 自然落到 null。
+     */
+    @Suppress("DEPRECATION")
+    private fun Bundle.optionalLong(key: String): Long? =
+        (get(key) as? Number)?.toLong()?.takeIf { it > 0 }
 
     private fun Bundle.putTokenUsage(usage: AgentTokenUsage) {
         usage.contextTokens?.let { putInt("usage_context", it) }

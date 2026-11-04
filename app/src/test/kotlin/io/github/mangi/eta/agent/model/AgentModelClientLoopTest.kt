@@ -391,6 +391,37 @@ class AgentModelClientLoopTest {
     }
 
     @Test
+    fun serialToolCallsDoNotInheritEarlierToolDurations() {
+        val events = mutableListOf<AgentEvent>()
+        val provider = ScriptedProvider(
+            assistant(
+                finishReason = "tool_calls",
+                toolCalls = listOf(
+                    toolCall("slow", "get_current_context", "{}"),
+                    toolCall("fast", "get_current_context", "{}"),
+                ),
+            ),
+            assistant(content = "完成", finishReason = "stop"),
+        )
+        AgentModelClient.complete(
+            config = modelConfig(),
+            prompt = "先后查询",
+            toolExecutor = AgentModelClient.ToolExecutor { call ->
+                if (call.id == "slow") Thread.sleep(150)
+                AgentModelClient.ToolResult("""{"ok":true}""")
+            },
+            provider = provider,
+            onEvent = events::add,
+        )
+        val finished = events.filterIsInstance<AgentEvent.ToolFinished>().associateBy { it.toolCallId }
+        val slow = requireNotNull(finished.getValue("slow").durationMs)
+        val fast = requireNotNull(finished.getValue("fast").durationMs)
+        assertTrue("慢调用记录自身执行耗时：$slow", slow >= 140)
+        // 串行批次里后一项从自己的执行开始计时，不累计前一项的耗时。
+        assertTrue("快调用不应继承前序耗时：$fast（慢调用 $slow）", fast < 100)
+    }
+
+    @Test
     fun steeringSkipsUnstartedCallsAndPreservesCompletedToolsWithoutCancellingResources() {
         val controller = AgentRunController()
         val cancelledResources = AtomicInteger(0)

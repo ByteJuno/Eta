@@ -98,6 +98,35 @@ class AgentRuntimeWireTest {
     }
 
     @Test
+    fun toolDurationSurvivesBundlesArchivesAndOldEventsWithoutTiming() {
+        val event = AgentEvent.ToolFinished(
+            round = 2,
+            toolCallId = "call-1",
+            name = "search_apps",
+            resultSummary = "ok=true",
+            imageCount = 0,
+            imageBytes = 0,
+            success = true,
+            command = "ls",
+            durationMs = 12_345L,
+        )
+        assertEquals(event, AgentRuntimeWire.eventFromBundle(AgentRuntimeWire.eventToBundle(event)))
+        // 归档事件按 JSON 往返，小整数会被重新解析成 Int，读取端必须按 Number 还原。
+        assertEquals(event, AgentEventJsonCodec.decode(AgentEventJsonCodec.encode(event)))
+        assertTrue(event.toLogLine().contains("duration_ms=12345"))
+        val longSpan = event.copy(durationMs = 5_000_000_000L)
+        assertEquals(longSpan, AgentRuntimeWire.eventFromBundle(AgentRuntimeWire.eventToBundle(longSpan)))
+        assertEquals(longSpan, AgentEventJsonCodec.decode(AgentEventJsonCodec.encode(longSpan)))
+
+        // 旧版本 Runtime 的 bundle 没有 duration_ms：保持 null，界面不显示耗时。
+        val legacy = AgentRuntimeWire.eventToBundle(event).apply { remove("duration_ms") }
+        assertNull((AgentRuntimeWire.eventFromBundle(legacy) as AgentEvent.ToolFinished).durationMs)
+        // 跳过/未执行的调用同样不携带耗时。
+        val skipped = event.copy(durationMs = null)
+        assertNull((AgentRuntimeWire.eventFromBundle(AgentRuntimeWire.eventToBundle(skipped)) as AgentEvent.ToolFinished).durationMs)
+    }
+
+    @Test
     fun searchSuggestionsCapabilityIsOptionalAndHtmlIsNeverDurable() {
         val request = AgentRuntimeWire.RunRequest(
             runId = "search", prompt = "测试", images = emptyList(),

@@ -418,6 +418,7 @@ internal class RootShellTerminalController(
             .put("stderr_truncated", !mergeStderr && result.stderr.length > MAX_OUTPUT_CHARS)
             .put("output_truncated", rawStdout.length > MAX_OUTPUT_CHARS || (!mergeStderr && result.stderr.length > MAX_OUTPUT_CHARS))
             .put("session_closed", result.timedOut || session.closed)
+            .apply { TerminalExitHint.attachTo(this, result.exitCode, session.environment) }
             .toString()
     }
 
@@ -569,6 +570,7 @@ internal class RootShellTerminalController(
             .put("stdout_truncated", result.outputTruncated || rawStdout.length > MAX_OUTPUT_CHARS || (mergeStderr && result.stderrTruncated))
             .put("stderr_truncated", !mergeStderr && (result.stderrTruncated || result.stderr.length > MAX_OUTPUT_CHARS))
             .put("output_truncated", result.outputTruncated || result.stderrTruncated || rawStdout.length > MAX_OUTPUT_CHARS || result.stderr.length > MAX_OUTPUT_CHARS)
+            .apply { TerminalExitHint.attachTo(this, result.exitCode, environment) }
             .toString()
     }
 

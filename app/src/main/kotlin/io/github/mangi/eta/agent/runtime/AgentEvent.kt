@@ -183,10 +183,17 @@ internal sealed interface AgentEvent {
         /** 可选：旧版本 Runtime 不发送，消费端缺省时回退到摘要文本判断。 */
         val success: Boolean? = null,
         val command: String? = null,
+        /**
+         * 可选：执行器自身的精确毫秒耗时，旧版本 Runtime 不发送。
+         *
+         * 跳过、拒收或未执行的调用保持 null；它只用于界面展示，不进入模型上下文。
+         */
+        val durationMs: Long? = null,
     ) : AgentEvent {
         override fun toLogLine(): String =
             "tool_finished round=$round, name=${name.toSafeLogToken()}, " +
-                "${resultSummary.toSafeResultLogFields()}, images=$imageCount, image_bytes=$imageBytes"
+                "${resultSummary.toSafeResultLogFields()}, images=$imageCount, image_bytes=$imageBytes, " +
+                "duration_ms=${durationMs ?: "-"}"
     }
 
     data class SubagentProgress(

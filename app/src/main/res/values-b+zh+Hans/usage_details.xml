@@ -1,0 +1,8 @@
+<resources>
+    <string name="usage_details_title">请求用量</string>
+    <string name="usage_input_label">输入 tokens</string>
+    <string name="usage_output_label">输出 tokens</string>
+    <string name="usage_cache_label">缓存输入 tokens</string>
+    <string name="usage_not_reported">未报告</string>
+    <string name="usage_cache_unknown_hint">服务商没有返回缓存用量。这不代表缓存命中为零，也不能据此判断按全价计费。</string>
+</resources>

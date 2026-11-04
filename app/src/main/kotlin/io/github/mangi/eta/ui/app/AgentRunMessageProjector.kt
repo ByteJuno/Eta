@@ -451,6 +451,8 @@ internal class AgentRunMessageProjector(
                     command = event.command ?: message.command,
                     resultSummary = event.resultSummary,
                     imageCount = event.imageCount,
+                    // 旧版本 Runtime 的事件没有耗时；已记录的值不因缺省字段被清掉
+                    durationMs = event.durationMs ?: message.durationMs,
                 )
             } else {
                 message

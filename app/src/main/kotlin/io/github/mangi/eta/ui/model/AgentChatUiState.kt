@@ -172,6 +172,11 @@ data class ToolActivityMessageUi(
     val command: String? = null,
     val resultSummary: String? = null,
     val imageCount: Int = 0,
+    /**
+     * 运行时测得的执行耗时；旧会话、旧版本 Runtime 或未执行的调用保持 null。
+     * 只用于界面简短提示，不进入模型上下文。
+     */
+    val durationMs: Long? = null,
 ) : AgentChatMessageUi
 
 enum class ToolActivityStatusUi {

@@ -292,6 +292,58 @@ class RootShellTerminalControllerTest {
         }
     }
 
+    @Test
+    fun missingAndroidCommandKeepsExitCodeAndAddsBoundedHint() {
+        val controller = RootShellTerminalController(NoopLogger, rootAvailable = { false })
+        val missing = "eta_missing_command_probe_9f3c"
+        try {
+            val result = JSONObject(
+                controller.executeTool("terminal", JSONObject().put("action", "exec")
+                    .put("command", missing)
+                    .put("cwd", temporaryFolder.root.absolutePath)
+                    .put("timeout_ms", 5_000)
+                    .put("identity", "user")
+                    .put("merge_stderr", false)
+                ),
+            )
+
+            assertFalse(result.toString(), result.getBoolean("ok"))
+            assertEquals(result.toString(), 127, result.getInt("exit_code"))
+            assertEquals("failed", result.getString("status"))
+            val hint = result.getString("hint")
+            assertTrue(hint, hint.contains("127"))
+            assertTrue(hint, hint.contains("environment=linux"))
+            // 提示是静态文案：不回显命令名，也不带工作目录。
+            assertFalse(hint, hint.contains(missing))
+            assertFalse(hint, hint.contains(temporaryFolder.root.absolutePath))
+            assertFalse(hint, hint.contains("\n"))
+            assertTrue(hint, hint.length <= TerminalExitHint.MAX_HINT_CHARS)
+        } finally {
+            controller.closeAll()
+        }
+    }
+
+    @Test
+    fun successfulAndroidCommandHasNoHint() {
+        val controller = RootShellTerminalController(NoopLogger, rootAvailable = { false })
+        try {
+            val result = JSONObject(
+                controller.executeTool("terminal", JSONObject().put("action", "exec")
+                    .put("command", "printf stable")
+                    .put("cwd", temporaryFolder.root.absolutePath)
+                    .put("timeout_ms", 5_000)
+                    .put("identity", "user")
+                ),
+            )
+
+            assertTrue(result.toString(), result.getBoolean("ok"))
+            assertEquals(0, result.getInt("exit_code"))
+            assertFalse(result.toString(), result.has("hint"))
+        } finally {
+            controller.closeAll()
+        }
+    }
+
     private object NoopLogger : AgentLogger {
         override fun debug(message: () -> String) = Unit
         override fun info(message: String) = Unit

@@ -471,6 +471,8 @@ internal object AgentConversationStore {
                 argumentsSummary = argumentsSummary,
                 resultSummary = resultSummary,
                 imageCount = imageCount,
+                // 工具行复用已有列：assistant 行存请求耗时，工具行存执行耗时，无需 schema 升级。
+                requestDurationMs = durationMs?.takeIf { it > 0 },
             )
 
             is ToolSummaryMessageUi -> ConversationMessageEntity(
@@ -534,6 +536,7 @@ internal object AgentConversationStore {
                 command = content.takeIf(String::isNotBlank),
                 resultSummary = resultSummary,
                 imageCount = imageCount,
+                durationMs = requestDurationMs?.takeIf { it > 0 },
             )
 
             TYPE_TOOL_SUMMARY -> ToolSummaryMessageUi(

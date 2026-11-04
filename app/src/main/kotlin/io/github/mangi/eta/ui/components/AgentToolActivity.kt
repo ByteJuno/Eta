@@ -138,6 +138,7 @@ internal fun ToolActivityRow(
     val failed = message.status == ToolActivityStatusUi.Failed
     val title = message.argumentsSummary.ifBlank { toolDisplayName(message.toolName) }
     val outcome = remember(message.status, message.resultSummary) { message.outcomeLine() }
+    val durationLabel = remember(message.durationMs) { toolDurationLabel(message.durationMs) }
     val browserLine = browserSnapshot?.let { snapshot ->
         when {
             snapshot.isLoading -> stringResource(R.string.tool_browser_loading, snapshot.progress)
@@ -195,7 +196,15 @@ internal fun ToolActivityRow(
                     )
                 }
             }
-            if (elapsedSeconds != null && elapsedSeconds >= RUNNING_TIMER_THRESHOLD_SECONDS) {
+            // 已结束的工具显示运行时实测耗时；仍在执行的工具继续走秒表。
+            if (durationLabel != null) {
+                Text(
+                    text = durationLabel,
+                    style = MiuixTheme.textStyles.footnote2,
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary.copy(alpha = 0.75f),
+                    modifier = Modifier.padding(start = 8.dp),
+                )
+            } else if (elapsedSeconds != null && elapsedSeconds >= RUNNING_TIMER_THRESHOLD_SECONDS) {
                 Text(
                     text = stringResource(R.string.tool_elapsed_seconds, elapsedSeconds),
                     style = MiuixTheme.textStyles.footnote2,
@@ -389,6 +398,21 @@ private fun rememberRunningSeconds(id: String, running: Boolean): Int? {
         }
     }
     return seconds
+}
+
+/**
+ * 耗时只占行尾一小段：毫秒级差异保留一位小数，长任务换成分秒。
+ * 单位后缀刻意保持语言无关（ms/s/m），因此不需要新增本地化字符串资源。
+ */
+internal fun toolDurationLabel(durationMs: Long?): String? {
+    val millis = durationMs?.takeIf { it > 0 } ?: return null
+    if (millis < 1_000) return "${millis}ms"
+    val seconds = millis / 1_000
+    if (seconds < 10) return "$seconds.${(millis % 1_000) / 100}s"
+    if (seconds < 60) return "${seconds}s"
+    val minutes = seconds / 60
+    val rest = seconds % 60
+    return if (rest == 0L) "${minutes}m" else "${minutes}m${rest}s"
 }
 
 private fun ToolActivityMessageUi.isTerminalTool(): Boolean =

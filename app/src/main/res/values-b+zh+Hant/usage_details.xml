@@ -1,0 +1,8 @@
+<resources>
+    <string name="usage_details_title">請求用量</string>
+    <string name="usage_input_label">輸入 tokens</string>
+    <string name="usage_output_label">輸出 tokens</string>
+    <string name="usage_cache_label">快取輸入 tokens</string>
+    <string name="usage_not_reported">未回報</string>
+    <string name="usage_cache_unknown_hint">服務商沒有回傳快取用量。這不代表快取命中為零，也不能據此判斷按全價計費。</string>
+</resources>
