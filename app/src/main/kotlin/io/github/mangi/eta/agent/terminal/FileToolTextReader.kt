@@ -22,7 +22,10 @@ internal class FileToolTextReader(private val backend: FileToolBackend) {
             .onMalformedInput(CodingErrorAction.REPORT)
             .onUnmappableCharacter(CodingErrorAction.REPORT)
         val result = decoder.decode(input, output, eof)
-        if (result.isError) throw FileToolException("NOT_UTF8_TEXT", "内容不是有效 UTF-8 文本，或字节游标位于字符中间")
+        if (result.isError) throw FileToolException(
+            "NOT_UTF8_TEXT",
+            "文件在字节偏移 ${offset + input.position()} 处不是有效 UTF-8 文本，或字节游标位于字符中间",
+        )
         if (bytes.isNotEmpty() && input.position() == 0) {
             throw FileToolException("READ_LIMIT_TOO_SMALL", "字节上限不足以读取一个完整字符，请使用至少 4 字节")
         }

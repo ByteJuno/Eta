@@ -130,6 +130,8 @@ internal class AgentFileOperations(private val backend: FileToolBackend) {
         expectedRevision: String? = null,
     ): String = fileToolOperation("edit_file") {
         if (oldText.isEmpty()) throw FileToolException("EMPTY_MATCH", "old_text 不能为空；创建文件请使用 write_file")
+        requireWellFormed("old_text", oldText)
+        requireWellFormed("new_text", newText)
         encodeBounded(oldText)
         encodeBounded(newText)
         val stat = regularFile(path, expectedRevision)
@@ -188,6 +190,28 @@ internal class AgentFileOperations(private val backend: FileToolBackend) {
 
     private fun verifyUnchanged(stat: FileToolStat) {
         if (backend.stat(stat.path).revision != stat.revision) throw FileToolException("FILE_CHANGED", "文件在操作期间已变化，请重试")
+    }
+
+    /**
+     * A lone UTF-16 surrogate (half of an emoji, e.g. from a truncated copy or a `\ud83d` escape)
+     * cannot be written as UTF-8. Name the argument and position so the caller can re-copy the
+     * text instead of assuming the file itself is corrupt.
+     */
+    private fun requireWellFormed(field: String, text: String) {
+        var index = 0
+        while (index < text.length) {
+            val ch = text[index]
+            val paired = Character.isHighSurrogate(ch) && index + 1 < text.length && Character.isLowSurrogate(text[index + 1])
+            if (paired) { index += 2; continue }
+            if (Character.isSurrogate(ch)) {
+                throw FileToolException(
+                    "INVALID_TEXT_ARGUMENT",
+                    "$field 在第 ${index + 1} 个字符处包含不完整的 emoji 或代理字符（U+${"%04X".format(ch.code)}），" +
+                        "文件未修改；请用 read_file 重新复制原文后重试",
+                )
+            }
+            index++
+        }
     }
 
     private fun encodeBounded(content: String): ByteArray {

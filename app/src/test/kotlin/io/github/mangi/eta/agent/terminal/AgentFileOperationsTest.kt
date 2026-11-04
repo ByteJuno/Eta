@@ -171,4 +171,38 @@ class AgentFileOperationsTest {
             throw AssertionError("cancelled read accepted")
         } catch (_: InterruptedException) { }
     }
+
+    @Test fun loneSurrogateInEditArgumentIsReportedAsArgumentErrorAndFileIsUntouched() {
+        val file = temporary.newFile("emoji.txt").apply { writeText("状态：\uD83D\uDE00 正常\n") }
+        val before = file.readBytes()
+        val operations = operations()
+
+        // Half of an emoji, as produced by a truncated copy or a "\ud83d" escape in tool-call JSON.
+        val result = JSONObject(operations.editFile(file.name, "\uD83D 正常", "已完成"))
+
+        assertEquals("INVALID_TEXT_ARGUMENT", result.getString("code"))
+        assertTrue(result.getString("message"), result.getString("message").contains("old_text"))
+        assertTrue(before.contentEquals(file.readBytes()))
+        val replacement = JSONObject(operations.editFile(file.name, "正常", "\uDE00"))
+        assertEquals("INVALID_TEXT_ARGUMENT", replacement.getString("code"))
+        assertTrue(replacement.getString("message").contains("new_text"))
+    }
+
+    @Test fun completeEmojiAcrossChunkBoundaryEditsSuccessfully() {
+        // A 4-byte emoji straddles the 16 000-byte read chunk; the edit must still find and replace it.
+        val prefix = "a".repeat(15_998)
+        val file = temporary.newFile("boundary.txt").apply { writeText(prefix + "\uD83D\uDE00 tail") }
+        val result = JSONObject(operations().editFile(file.name, "\uD83D\uDE00 tail", "done"))
+
+        assertEquals(result.toString(), 1, result.getInt("replacements"))
+        assertEquals(prefix + "done", file.readText())
+    }
+
+    @Test fun genuinelyInvalidFileReportsTheFailingByteOffset() {
+        val file = temporary.newFile("bad.bin.txt").apply { writeBytes("ok".toByteArray() + byteArrayOf(0xC3.toByte(), 0x28)) }
+        val result = JSONObject(operations().editFile(file.name, "ok", "x"))
+
+        assertEquals("NOT_UTF8_TEXT", result.getString("code"))
+        assertTrue(result.getString("message"), result.getString("message").contains("2"))
+    }
 }

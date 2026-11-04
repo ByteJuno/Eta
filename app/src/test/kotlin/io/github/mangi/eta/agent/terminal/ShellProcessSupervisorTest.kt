@@ -63,7 +63,7 @@ class ShellProcessSupervisorTest {
             linuxRootfsPath = null,
         )
         val function = Regex("eta_cleanup_toybox_group\\(\\) \\{.*?return 0; \\}").find(launcher)!!.value
-        val dir = createTempDir(prefix = "eta-toybox")
+        val dir = kotlin.io.path.createTempDirectory("eta-toybox").toFile()
         try {
             val fake = File(dir, "toybox").apply {
                 writeText("#!/bin/sh\nprintf '%s %s\\n' \"${'$'}ETA_SELF\" \"${'$'}ETA_SELF\" 4242 \"${'$'}ETA_SELF\" 9999 1\n")
