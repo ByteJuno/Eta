@@ -45,8 +45,14 @@ internal object RemoteModelFetcher {
     suspend fun fetch(provider: ProviderSetting): Result<List<Model>> =
         fetchCatalog(provider).map(RemoteModelCatalog::models)
 
-    suspend fun fetchCatalog(provider: ProviderSetting): Result<RemoteModelCatalog> =
-        fetchCatalog(provider, AgentHttpClient.client, StoredCredentials)
+    suspend fun fetchCatalog(provider: ProviderSetting): Result<RemoteModelCatalog> {
+        val fetched = fetchCatalog(provider, AgentHttpClient.client, StoredCredentials)
+        val catalog = fetched.getOrNull() ?: return fetched
+        // Proxies often list ids only; look up the missing windows once from a public index.
+        val filled = PublicContextWindowCatalog.fillMissing(catalog.models)
+        return if (filled === catalog.models) fetched
+        else Result.success(RemoteModelCatalog(filled, catalog.connection, catalog.accountBinding))
+    }
 
     internal suspend fun fetchCatalog(
         provider: ProviderSetting,
