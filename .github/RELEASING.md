@@ -8,7 +8,7 @@
 - fork 已关闭应用内更新检查：上游 Release 使用不同签名，无法覆盖安装本 fork。
 - `virtual-screen` 构建成功后，`保存构建草稿` job 会把签名 Release APK 存为 Release 草稿 `build-<短提交号>`（不创建标签，仅维护者可见），保留最近 5 个；Artifact 过期后从草稿下载。草稿未经真机验收不要发布。
 - 若 PR Check 已在完全相同的代码树上通过（功能分支从 `virtual-screen` 最新提交开出并直接合并时成立），Eta Build 的 `Lint 与单元测试` job 会跳过重复检查；树不同或发版标签时照常完整检查。
-- main push、标签与 PR 触发规则仍保留，日常避免触发这些入口。
+- 工作流已强制此约定：Eta Build 的检查与打包 job 只在 `virtual-screen` 或 `v*` 标签上执行，其他分支派发会直接跳过；push `main` 不再触发构建；PR Check 只针对 `virtual-screen`。注意派发会使用目标分支自身的工作流文件，限制只对已包含此改动的分支生效。
 - 下方与本约定冲突的旧流程仅供历史参考。
 
 # Eta 发布流程

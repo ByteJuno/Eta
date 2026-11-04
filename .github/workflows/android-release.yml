@@ -1,9 +1,10 @@
 name: Eta Build
 
+# Fork 约定：只从 virtual-screen 构建（手动派发），或从 v* 标签发版。
+# 其他分支派发时各 job 直接跳过；派发会使用该分支自身的工作流文件，
+# 因此只有含此限制的分支才受约束。
 on:
   push:
-    branches:
-      - main
     tags:
       - "v*"
   workflow_dispatch:
@@ -19,6 +20,7 @@ jobs:
   # 与打包并行且不接触签名 Secrets；失败不影响 APK 上传，但会阻止发版草稿
   verify:
     name: Lint 与单元测试
+    if: github.ref_type == 'tag' || github.ref_name == 'virtual-screen'
     runs-on: ubuntu-latest
     timeout-minutes: 40
     permissions:
@@ -75,6 +77,7 @@ jobs:
 
   build-apks:
     name: 构建 Debug 与 Release APK
+    if: github.ref_type == 'tag' || github.ref_name == 'virtual-screen'
     runs-on: ubuntu-latest
     timeout-minutes: 40
 

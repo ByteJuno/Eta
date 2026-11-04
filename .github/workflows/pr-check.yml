@@ -3,7 +3,6 @@ name: PR Check
 on:
   pull_request:
     branches:
-      - main
       - virtual-screen
   workflow_dispatch:
 
