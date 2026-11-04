@@ -898,6 +898,8 @@
   <string name="settings_write_failed">無法儲存設定</string>
   <string name="status_processing">處理中…</string>
   <string name="power_assistant_system_default">系統預設助理</string>
+  <string name="settings_power_eta_open_main">直接開啟 Eta 主頁面</string>
+  <string name="settings_power_eta_open_main_summary">長按電源鍵直接進入 Eta 主介面，不彈出語音浮窗</string>
   <string name="systemizer_already_system">Google App 已是系統 priv-app</string>
   <string name="systemizer_google_missing">尚未安裝 Google App</string>
   <string name="systemizer_root_manager_missing">未偵測到 Magisk 或 KernelSU</string>

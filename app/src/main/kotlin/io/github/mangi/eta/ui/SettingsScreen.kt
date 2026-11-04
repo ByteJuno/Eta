@@ -510,6 +510,17 @@ private fun SettingsPageContent(
                             },
                             enabled = prefs != null,
                         )
+                        if (powerAssistantTarget == PowerAssistantTarget.ETA) {
+                            SwitchPref(
+                                context = context,
+                                prefs = prefs,
+                                title = stringResource(R.string.settings_power_eta_open_main),
+                                summary = stringResource(R.string.settings_power_eta_open_main_summary),
+                                key = Prefs.Keys.POWER_KEY_ETA_OPEN_MAIN,
+                                icon = Icons.Rounded.PowerSettingsNew,
+                                iconTint = SettingsIconColors.Yellow,
+                            )
+                        }
                         SwitchPref(
                             context = context,
                             prefs = prefs,

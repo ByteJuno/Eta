@@ -18,6 +18,7 @@ internal object ModuleConfig {
         "$GOOGLE_PACKAGE/com.google.android.voiceinteraction.GsaVoiceInteractionService"
     const val ETA_VOICE_INTERACTION_COMPONENT =
         "$ETA_PACKAGE/io.github.mangi.eta.agent.voice.EtaVoiceInteractionService"
+    const val ETA_MAIN_ACTIVITY_CLASS = "$ETA_PACKAGE.ui.MainActivity"
     const val ASSISTANT_ROLE = "android.app.role.ASSISTANT"
     const val SECURE_ASSISTANT = "assistant"
     const val SECURE_VOICE_INTERACTION_SERVICE = "voice_interaction_service"
