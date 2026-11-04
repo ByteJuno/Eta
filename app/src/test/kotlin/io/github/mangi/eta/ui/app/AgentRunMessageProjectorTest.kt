@@ -48,7 +48,7 @@ class AgentRunMessageProjectorTest {
         )
         assertEquals(1_480L, messages.filterIsInstance<ToolActivityMessageUi>().single().durationMs)
 
-        // 旧版本 Runtime 的事件没有 durationMs：保持 null，界面不显示耗时。
+        // A delayed legacy event must not erase an already measured duration.
         val legacy = projector.finishTool(
             runId,
             AgentEvent.ToolFinished(
@@ -61,7 +61,20 @@ class AgentRunMessageProjectorTest {
             ),
             messages,
         )
-        assertNull(legacy.filterIsInstance<ToolActivityMessageUi>().single().durationMs)
+        assertEquals(1_480L, legacy.filterIsInstance<ToolActivityMessageUi>().single().durationMs)
+
+        // A genuinely old tool record, never measured, must remain unknown rather than zero.
+        val oldMessages = projector.startTool(
+            "legacy-run",
+            AgentEvent.ToolStarted(1, "legacy-call", "read_file", "read"),
+            emptyList(),
+        )
+        val oldFinished = projector.finishTool(
+            "legacy-run",
+            AgentEvent.ToolFinished(1, "legacy-call", "read_file", "ok=true", 0, 0),
+            oldMessages,
+        )
+        assertNull(oldFinished.filterIsInstance<ToolActivityMessageUi>().single().durationMs)
     }
 
     @Test
