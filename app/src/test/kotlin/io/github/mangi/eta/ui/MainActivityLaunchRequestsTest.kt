@@ -1,6 +1,8 @@
 package io.github.mangi.eta.ui
 
+import android.content.ClipData
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.os.Parcel
 import io.github.mangi.eta.agent.runtime.AgentRuntimeWire
@@ -113,6 +115,50 @@ class MainActivityLaunchRequestsTest {
         )
     }
 
+    @Test
+    fun `单文件与多文件分享提取去重URI与附带文本且消费后重建不重放`() {
+        val fileUri = Uri.parse("content://provider/files/report.pdf")
+        val imageUri = Uri.parse("content://provider/images/photo.png")
+        val singleShare = Intent(Intent.ACTION_SEND).apply {
+            type = "application/pdf"
+            putExtra(Intent.EXTRA_STREAM, fileUri)
+            putExtra(Intent.EXTRA_TEXT, "帮我总结这份文档")
+        }
+        val acceptedSingle = MainActivityLaunchRequests.restore(null, singleShare)
+        assertEquals(
+            IncomingShareRequest(
+                uris = listOf(fileUri.toString()),
+                mimeType = "application/pdf",
+                text = "帮我总结这份文档",
+            ),
+            acceptedSingle.sharedContent,
+        )
+
+        val consumed = acceptedSingle.copy(sharedContent = null)
+        assertEquals(
+            MainActivityLaunchRequests(),
+            MainActivityLaunchRequests.restore(savedState(consumed), singleShare),
+        )
+
+        val multiShare = Intent(Intent.ACTION_SEND_MULTIPLE).apply {
+            type = "*/*"
+            putParcelableArrayListExtra(Intent.EXTRA_STREAM, arrayListOf(fileUri, imageUri))
+            clipData = ClipData.newRawUri("shared", fileUri).apply {
+                addItem(ClipData.Item(imageUri))
+            }
+            putExtra(Intent.EXTRA_TEXT, fileUri.toString())
+        }
+        val acceptedMulti = MainActivityLaunchRequests().accept(multiShare)
+        assertEquals(
+            IncomingShareRequest(
+                uris = listOf(fileUri.toString(), imageUri.toString()),
+                mimeType = "*/*",
+                text = null,
+            ),
+            acceptedMulti.sharedContent,
+        )
+    }
+
     private fun savedState(requests: MainActivityLaunchRequests): Bundle {
         val state = Bundle().also(requests::saveTo)
         val parcel = Parcel.obtain()
@@ -123,5 +169,32 @@ class MainActivityLaunchRequestsTest {
         } finally {
             parcel.recycle()
         }
+    }
+
+    @Test
+    fun shareRejectsFileAndOwnProviderUris() {
+        val share = Intent(Intent.ACTION_SEND_MULTIPLE).apply {
+            type = "*/*"
+            putParcelableArrayListExtra(
+                Intent.EXTRA_STREAM,
+                arrayListOf(
+                    Uri.parse("file:///data/data/io.github.mangi.eta/databases/eta.db"),
+                    Uri.parse("content://io.github.mangi.eta.accessibility.health/state"),
+                    Uri.parse("https://example.com/a.png"),
+                    Uri.parse("content://provider/files/report.pdf"),
+                ),
+            )
+        }
+        assertEquals(
+            listOf("content://provider/files/report.pdf"),
+            MainActivityLaunchRequests().accept(share).sharedContent?.uris,
+        )
+        val onlyUnsafe = Intent(Intent.ACTION_SEND).apply {
+            type = "application/octet-stream"
+            putExtra(Intent.EXTRA_STREAM, Uri.parse("file:///data/data/io.github.mangi.eta/shared_prefs/x.xml"))
+        }
+        assertEquals(null, MainActivityLaunchRequests().accept(onlyUnsafe).sharedContent)
+        assertEquals(false, isAcceptableSharedUri("content://io.github.mangi.eta/x"))
+        assertEquals(true, isAcceptableSharedUri("content://com.android.providers.media.documents/document/image%3A1"))
     }
 }

@@ -87,8 +87,10 @@ import top.yukonga.miuix.kmp.icon.extended.Layers
 import top.yukonga.miuix.kmp.icon.extended.Lock
 import top.yukonga.miuix.kmp.icon.extended.Messages
 import top.yukonga.miuix.kmp.icon.extended.Notes
+import top.yukonga.miuix.kmp.icon.extended.Pin
 import top.yukonga.miuix.kmp.icon.extended.Rename
 import top.yukonga.miuix.kmp.icon.extended.Settings
+import top.yukonga.miuix.kmp.icon.extended.Unpin
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.overScrollVertical
 import top.yukonga.miuix.kmp.utils.scrollEndHaptic
@@ -131,6 +133,7 @@ internal fun ConversationPanePanel(
     onSearchChange: (String) -> Unit,
     onNewConversation: () -> Unit,
     onConversationSelected: (String) -> Unit,
+    onConversationTogglePin: (ConversationSummaryUi) -> Unit,
     onConversationRename: (ConversationSummaryUi) -> Unit,
     onConversationExport: (ConversationSummaryUi) -> Unit,
     onConversationDelete: (ConversationSummaryUi) -> Unit,
@@ -268,6 +271,7 @@ internal fun ConversationPanePanel(
                                 conversation = conversation,
                                 selected = conversation.id == state.selectedConversationId,
                                 onClick = { onConversationSelected(conversation.id) },
+                                onTogglePin = { onConversationTogglePin(conversation) },
                                 onRename = { onConversationRename(conversation) },
                                 onExport = { onConversationExport(conversation) },
                                 onDelete = { onConversationDelete(conversation) },
@@ -399,6 +403,7 @@ private fun ConversationTextRow(
     conversation: ConversationSummaryUi,
     selected: Boolean,
     onClick: () -> Unit,
+    onTogglePin: () -> Unit,
     onRename: () -> Unit,
     onExport: () -> Unit,
     onDelete: () -> Unit,
@@ -478,9 +483,25 @@ private fun ConversationTextRow(
             alignment = PopupPositionProvider.Align.BottomEnd,
             onDismissRequest = { showActionMenu = false },
         ) {
+            val pinText = stringResource(
+                if (conversation.isPinned) R.string.action_unpin_conversation else R.string.action_pin_conversation,
+            )
             val renameText = stringResource(R.string.action_rename)
             val exportText = stringResource(R.string.action_export)
             val deleteText = stringResource(R.string.action_delete)
+            val pinIcon = if (conversation.isPinned) MiuixIcons.Unpin else MiuixIcons.Pin
+            val pinItem = remember(pinText, pinIcon) {
+                DropdownItem(
+                    text = pinText,
+                    icon = { modifier ->
+                        Icon(
+                            imageVector = pinIcon,
+                            contentDescription = null,
+                            modifier = modifier.size(ConversationPanelMetrics.ActionIconSize),
+                        )
+                    },
+                )
+            }
             val renameItem = remember(renameText) {
                 DropdownItem(
                     text = renameText,
@@ -525,10 +546,20 @@ private fun ConversationTextRow(
             )
             ListPopupColumn {
                 DropdownImpl(
-                    item = renameItem,
-                    optionSize = 3,
+                    item = pinItem,
+                    optionSize = 4,
                     isSelected = false,
                     index = 0,
+                    onSelectedIndexChange = {
+                        showActionMenu = false
+                        onTogglePin()
+                    },
+                )
+                DropdownImpl(
+                    item = renameItem,
+                    optionSize = 4,
+                    isSelected = false,
+                    index = 1,
                     onSelectedIndexChange = {
                         showActionMenu = false
                         onRename()
@@ -536,9 +567,9 @@ private fun ConversationTextRow(
                 )
                 DropdownImpl(
                     item = exportItem,
-                    optionSize = 3,
+                    optionSize = 4,
                     isSelected = false,
-                    index = 1,
+                    index = 2,
                     onSelectedIndexChange = {
                         showActionMenu = false
                         onExport()
@@ -546,9 +577,9 @@ private fun ConversationTextRow(
                 )
                 DropdownImpl(
                     item = deleteItem,
-                    optionSize = 3,
+                    optionSize = 4,
                     isSelected = false,
-                    index = 2,
+                    index = 3,
                     dropdownColors = deleteColors,
                     onSelectedIndexChange = {
                         showActionMenu = false

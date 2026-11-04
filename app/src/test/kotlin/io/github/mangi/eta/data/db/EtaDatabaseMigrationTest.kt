@@ -98,11 +98,12 @@ class EtaDatabaseMigrationTest {
         val database = Room.databaseBuilder(context, EtaDatabase::class.java, name)
             .addMigrations(EtaDatabase.MIGRATION_22_23, EtaDatabase.MIGRATION_23_24,
                 EtaDatabase.MIGRATION_24_25, EtaDatabase.MIGRATION_25_26, EtaDatabase.MIGRATION_26_27,
-                EtaDatabase.MIGRATION_27_28).build()
+                EtaDatabase.MIGRATION_27_28, EtaDatabase.MIGRATION_28_29).build()
         try {
             runBlocking(Dispatchers.IO) {
                 val conversation = database.conversationDao().conversations().first { it.id == "conv-1" }
                 assertEquals("保留的对话", conversation.title)
+                assertEquals(false, conversation.isPinned)
                 assertEquals(if (upstream || contribution) "kept-model" else null, conversation.modelId)
                 assertEquals(if (upstream) "" else "{\"inputTokens\":42}", conversation.lastModelUsageJson)
                 assertEquals(if (upstream || contribution) "" else "UI_EXECUTION_PAUSED",
@@ -122,7 +123,7 @@ class EtaDatabaseMigrationTest {
     }
 
     @Test
-    fun migration6To28PreservesDataAndMovesCompleteConversationContext() {
+    fun migration6To29PreservesDataAndMovesCompleteConversationContext() {
         val context = RuntimeEnvironment.getApplication() as Context
         val databaseName = "migration-${UUID.randomUUID()}.db"
         createVersion6Database(context, databaseName)
@@ -162,6 +163,7 @@ class EtaDatabaseMigrationTest {
                 EtaDatabase.MIGRATION_25_26,
                 EtaDatabase.MIGRATION_26_27,
                 EtaDatabase.MIGRATION_27_28,
+                EtaDatabase.MIGRATION_28_29,
             )
             .build()
         try {
@@ -225,6 +227,7 @@ class EtaDatabaseMigrationTest {
             assertEquals(emptyList<CharacterEntity>(), runBlocking(Dispatchers.IO) { database.characterDao().characters() })
             assertEquals("off", conversations.first { it.id == "conv-1" }.reasoningEffort)
             assertEquals(null, conversations.first { it.id == "conv-1" }.modelId)
+            assertEquals(false, conversations.first { it.id == "conv-1" }.isPinned)
             assertEquals("default", conversations.first { it.id == "conv-enabled" }.reasoningEffort)
             assertEquals(null, runBlocking(Dispatchers.IO) { database.conversationDao().state() })
             assertEquals(listOf("built-in", "manual"), provider.models.map { it.modelId })
