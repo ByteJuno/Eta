@@ -29,7 +29,7 @@ import androidx.room.migration.Migration
         AgentTaskRunEntity::class,
         LearningProposalEntity::class,
     ],
-    version = 28,
+    version = 29,
     exportSchema = false,
 )
 internal abstract class EtaDatabase : RoomDatabase() {
@@ -76,6 +76,7 @@ internal abstract class EtaDatabase : RoomDatabase() {
                         MIGRATION_25_26,
                         MIGRATION_26_27,
                         MIGRATION_27_28,
+                        MIGRATION_28_29,
                     )
                     .addCallback(object : Callback() {
                         override fun onCreate(db: androidx.sqlite.db.SupportSQLiteDatabase) { createTextChunkCleanup(db) }
@@ -196,6 +197,17 @@ internal abstract class EtaDatabase : RoomDatabase() {
             if (!hasAuthMode) {
                 database.execSQL("ALTER TABLE model_providers ADD COLUMN auth_mode TEXT NOT NULL DEFAULT 'api_key'")
             }
+        }
+
+        internal val MIGRATION_28_29 = Migration(28, 29) { database ->
+            // Upstream added conversations.is_pinned as its 23 -> 24 step; the fork already used 24-28.
+            val hasPinned = database.query("PRAGMA table_info(conversations)").use { cursor ->
+                val nameIndex = cursor.getColumnIndexOrThrow("name")
+                var found = false
+                while (cursor.moveToNext()) if (cursor.getString(nameIndex) == "is_pinned") found = true
+                found
+            }
+            if (!hasPinned) database.execSQL("ALTER TABLE conversations ADD COLUMN is_pinned INTEGER NOT NULL DEFAULT 0")
         }
 
         private fun createTextChunkCleanup(database: androidx.sqlite.db.SupportSQLiteDatabase) {

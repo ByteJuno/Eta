@@ -52,6 +52,7 @@ import io.github.mangi.eta.agent.runtime.AgentRuntimeService
 import io.github.mangi.eta.core.AndroidAgentLogger
 import io.github.mangi.eta.data.repository.RuntimeConfigRepository
 import io.github.mangi.eta.ui.AppearanceSettingsScreen
+import io.github.mangi.eta.ui.IncomingShareRequest
 import io.github.mangi.eta.ui.SettingsScreen
 import io.github.mangi.eta.ui.components.MiuixDialogActions
 import io.github.mangi.eta.ui.model.AgentHomeAction
@@ -123,6 +124,8 @@ fun AgentAppRoot(
     onRequestedConversationOpened: () -> Unit = {},
     requestedArchivedConversation: ArchivedConversationRequest? = null,
     onArchivedConversationOpened: () -> Unit = {},
+    sharedContent: IncomingShareRequest? = null,
+    onSharedContentAccepted: () -> Unit = {},
     openSpeechSettings: Boolean = false,
     openTerminal: Boolean = false,
     onTerminalOpened: () -> Unit = {},
@@ -261,6 +264,18 @@ fun AgentAppRoot(
         onAssistantConversationOpened(opened)
     }
 
+    LaunchedEffect(sharedContent) {
+        val request = sharedContent ?: return@LaunchedEffect
+        focusManager.clearFocus()
+        conversationPaneOpen = false
+        if (backStack.lastOrNull() != AppRoute.Home) {
+            navigator.popToHome()
+            navigationResetKey++
+        }
+        agentState.acceptSharedContent(request)
+        onSharedContentAccepted()
+    }
+
     fun pushRoute(
         route: AppRoute,
         restoreConversationPaneOnBack: Boolean = conversationPaneOpen,
@@ -347,6 +362,9 @@ fun AgentAppRoot(
             onRefreshKimiWeb = appViewModel::refreshKimiWeb,
             onOpenBrowser = { openConversationBrowser() },
             onSelectConversation = { conversationId -> selectConversation(conversationId) },
+            onConversationTogglePin = { conversation ->
+                agentState.toggleConversationPin(conversation.id)
+            },
             onConversationRename = { conversation ->
                 conversationRenameTarget = conversation
             },
