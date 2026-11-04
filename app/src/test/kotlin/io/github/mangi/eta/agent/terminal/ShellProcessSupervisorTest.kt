@@ -26,6 +26,65 @@ class ShellProcessSupervisorTest {
     }
 
     @Test
+    fun groupCleanupPrefersSingleToyboxListingAndKeepsProcFallbackAndExitStatus() {
+        val launcher = ShellProcessSupervisor().buildTrackedShellLauncher(
+            ownershipFile = File(System.getProperty("java.io.tmpdir"), "eta-cleanup-test.owner"),
+            ownershipToken = "token123",
+            command = "exit 7",
+            identity = "user",
+            environment = TerminalEnvironment.ANDROID,
+            linuxRootfsPath = null,
+        )
+
+        // Fast path: one absolute-path toybox listing, checked before the per-process /proc loop.
+        val fast = launcher.indexOf("eta_cleanup_toybox_group && eta_cleanup_toybox_group")
+        val slow = launcher.indexOf("eta_cleanup_proc_group; eta_cleanup_proc_group")
+        assertTrue(launcher.contains("/system/bin/toybox ps -A -o PID=,PGID="))
+        assertTrue(fast in 0 until slow)
+        // The /proc loop still runs whenever toybox is missing or fails, so no orphan is left behind.
+        assertTrue(launcher.contains("then :; else eta_cleanup_proc_group; eta_cleanup_proc_group; fi"))
+        // Non-/proc systems keep the ps/awk path, and the payload status is still returned.
+        assertTrue(launcher.contains("else eta_cleanup_ps_group; eta_cleanup_ps_group; fi"))
+        assertTrue(launcher.contains("eta_status=${'$'}?"))
+        assertTrue(launcher.contains("exit ${'$'}eta_status"))
+    }
+
+    @Test
+    fun toyboxCleanupKillsOnlyItsOwnGroupInARealShell() {
+        val sh = File("/bin/sh").takeIf { it.canExecute() } ?: return
+        // Extract just the cleanup functions and drive the toybox branch with a fake toybox that
+        // reports one sibling in our group, one stranger, and ourselves.
+        val launcher = ShellProcessSupervisor().buildTrackedShellLauncher(
+            ownershipFile = File(System.getProperty("java.io.tmpdir"), "eta-cleanup-run.owner"),
+            ownershipToken = "token123",
+            command = "true",
+            identity = "user",
+            environment = TerminalEnvironment.ANDROID,
+            linuxRootfsPath = null,
+        )
+        val function = Regex("eta_cleanup_toybox_group\\(\\) \\{.*?return 0; \\}").find(launcher)!!.value
+        val dir = createTempDir(prefix = "eta-toybox")
+        try {
+            val fake = File(dir, "toybox").apply {
+                writeText("#!/bin/sh\nprintf '%s %s\\n' \"${'$'}ETA_SELF\" \"${'$'}ETA_SELF\" 4242 \"${'$'}ETA_SELF\" 9999 1\n")
+                setExecutable(true)
+            }
+            val script = function.replace("/system/bin/toybox", fake.absolutePath) +
+                "; kill() { echo \"killed ${'$'}*\"; }; ETA_SELF=${'$'}${'$'}; export ETA_SELF; eta_cleanup_toybox_group; echo rc=${'$'}?"
+            val process = ProcessBuilder(sh.absolutePath, "-c", script).redirectErrorStream(true).start()
+            val output = process.inputStream.bufferedReader().readText()
+            process.waitFor()
+
+            assertTrue(output, output.contains("killed -9 4242"))
+            assertFalse(output, output.contains("9999"))
+            assertEquals(1, Regex("killed ").findAll(output).count())
+            assertTrue(output, output.contains("rc=0"))
+        } finally {
+            dir.deleteRecursively()
+        }
+    }
+
+    @Test
     fun rootAndroidPayloadUsesDiscoveredBusyBoxWithoutChangingUserShell() {
         val supervisor = ShellProcessSupervisor()
 

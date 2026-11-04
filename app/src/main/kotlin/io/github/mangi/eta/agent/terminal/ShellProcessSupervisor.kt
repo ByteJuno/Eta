@@ -174,6 +174,9 @@ internal class ShellProcessSupervisor(
         unregisterProcess(process)
     }
 
+    /** Absolute path so cleanup never depends on PATH order or a BusyBox applet with a different ps. */
+    private val TOYBOX = "/system/bin/toybox"
+
     internal fun buildTrackedShellLauncher(
         ownershipFile: File,
         ownershipToken: String,
@@ -226,8 +229,18 @@ internal class ShellProcessSupervisor(
                 "for pid in ${'$'}(ps -axo pid=,pgid= | " +
                 "awk -v group=\"${'$'}${'$'}\" '${'$'}2 == group && ${'$'}1 != group { print ${'$'}1 }'); do " +
                 "kill -9 \"${'$'}pid\" 2>/dev/null; done; }; " +
+                // One toybox ps exec lists every pgid at once; reading /proc/*/stat from the shell costs
+                // one read per process (~1000 on a phone, 100-200 ms per pass). Falls back when absent.
+                "eta_cleanup_toybox_group() { " +
+                "[ -x $TOYBOX ] || return 1; " +
+                "eta_rows=${'$'}($TOYBOX ps -A -o PID=,PGID= 2>/dev/null) || return 1; " +
+                "[ -n \"${'$'}eta_rows\" ] || return 1; set -- ${'$'}eta_rows; " +
+                "while [ \"${'$'}#\" -ge 2 ]; do " +
+                "if [ \"${'$'}2\" = \"${'$'}${'$'}\" ] && [ \"${'$'}1\" != \"${'$'}${'$'}\" ]; then kill -9 \"${'$'}1\" 2>/dev/null; fi; " +
+                "shift 2; done; return 0; }; " +
                 "if [ -d /proc/${'$'}${'$'} ]; then " +
-                "eta_cleanup_proc_group; eta_cleanup_proc_group; " +
+                "if eta_cleanup_toybox_group && eta_cleanup_toybox_group; then :; " +
+                "else eta_cleanup_proc_group; eta_cleanup_proc_group; fi; " +
                 "else eta_cleanup_ps_group; eta_cleanup_ps_group; fi"
         val groupScript =
             "printf '%s group\\n' \"${'$'}${'$'}\" > $path; " +
