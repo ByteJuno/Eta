@@ -1827,7 +1827,6 @@ internal class AgentAppState(
     fun acceptSharedContent(request: IncomingShareRequest) {
         val canReuseCurrentDraft = homeState.isConversationLoaded &&
             homeState.roleplay == null &&
-            selectedConversationId?.isReadOnlyExternalArchiveConversation() != true &&
             homeState.messages.isEmpty() &&
             !homeState.hasEarlierMessages &&
             !homeState.isStreaming &&
