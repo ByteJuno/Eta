@@ -1,26 +1,27 @@
 # Fork 当前构建约定（优先于下方历史说明）
 
-- 用户最终指定的集成与构建分支为 `virtual-screen`，不使用 `main` 构建。
-- 功能分支仅用于编辑和审查；获准改动合入 `virtual-screen` 后再构建。
-- 推送后执行：`gh workflow run android-release.yml --repo ByteJuno/Eta --ref virtual-screen`。
+- 用户最终指定的集成与构建分支为 `main`。
+- 功能分支仅用于编辑和审查；获准改动合入 `main` 后再构建。
+- 推送后执行：`gh workflow run android-release.yml --repo ByteJuno/Eta --ref main`。
 - 核对运行提交号，验证 Lint、完整单元测试、Debug 和签名 Release；不自动安装或公开发布。
 - 非标签构建的 versionCode 由 CI 按提交时间（北京时间）生成：`yyyyMMdd` + 当日 15 分钟时段 `00–95`，只会高于 `app/build.gradle.kts` 中的手写值；后续提交的包可直接覆盖安装，同一提交重复构建结果一致。
 - fork 已关闭应用内更新检查：上游 Release 使用不同签名，无法覆盖安装本 fork。
-- `virtual-screen` 构建成功后，`保存构建草稿` job 会把签名 Release APK 存为 Release 草稿 `build-<短提交号>`（不创建标签，仅维护者可见），保留最近 5 个；Artifact 过期后从草稿下载。草稿未经真机验收不要发布。
-- 若 PR Check 已在完全相同的代码树上通过（功能分支从 `virtual-screen` 最新提交开出并直接合并时成立），Eta Build 的 `Lint 与单元测试` job 会跳过重复检查；树不同或发版标签时照常完整检查。
-- 工作流已强制此约定：Eta Build 的检查与打包 job 只在 `virtual-screen` 或 `v*` 标签上执行，其他分支派发会直接跳过；push `main` 不再触发构建；PR Check 只针对 `virtual-screen`。注意派发会使用目标分支自身的工作流文件，限制只对已包含此改动的分支生效。
+- `main` 构建成功后，`保存构建草稿` job 会把签名 Release APK 存为 Release 草稿 `build-<短提交号>`（不创建标签，仅维护者可见），保留最近 5 个；Artifact 过期后从草稿下载。草稿未经真机验收不要发布。
+- 若 PR Check 已在完全相同的代码树上通过（功能分支从 `main` 最新提交开出并直接合并时成立），Eta Build 的 `Lint 与单元测试` job 会跳过重复检查；树不同或发版标签时照常完整检查。
+- 工作流已强制此约定：Eta Build 的检查与打包 job 只在 `main` 或 `v*` 标签上执行，其他分支派发会直接跳过；push `main` 不再触发构建；PR Check 只针对 `main`。注意派发会使用目标分支自身的工作流文件，限制只对已包含此改动的分支生效。
+- 版本名使用 `上游版本-fork.N`；上游升版时重置为 `上游新版本-fork.1`，同一上游版本内递增 N。
 - 下方与本约定冲突的旧流程仅供历史参考。
 
 # Eta 发布流程
 
 ## Fork 开发测试约定
 
-`ByteJuno/Eta` 的编译、单元测试、Lint 和 APK 打包统一在 GitHub Actions 执行；默认不在本机运行 Gradle。开发时将改动提交并推送到自己的功能分支，再手动触发云端构建：
+`ByteJuno/Eta` 的编译、单元测试、Lint 和 APK 打包统一在 GitHub Actions 执行；默认不在本机运行 Gradle。开发时将改动推送到功能分支并审查，合入 `main` 后再手动触发云端构建：
 
 ```bash
-git push -u origin <功能分支>
-gh workflow run android-release.yml --repo ByteJuno/Eta --ref <功能分支>
-gh run list --repo ByteJuno/Eta --workflow android-release.yml --branch <功能分支>
+git push origin main
+gh workflow run android-release.yml --repo ByteJuno/Eta --ref main
+gh run list --repo ByteJuno/Eta --workflow android-release.yml --branch main
 ```
 
 确认运行的提交号与推送提交一致，并检查 Lint、完整单元测试、Debug 与签名 Release 构建结果。测试安装包从该次运行的 Artifacts 下载。功能分支不需要推送标签或公开发布 Release。用户完成真机验收并确认后，再整理上游 PR。
@@ -52,7 +53,7 @@ gh secret set ETA_RELEASE_KEY_PASSWORD
 
 ## PR 检查
 
-指向 `main` 或 `virtual-screen` 的 Pull Request 会触发 `PR Check`，依次执行 Lint、单元测试和 Debug 构建，
+指向 `main` 的 Pull Request 会触发 `PR Check`，依次执行 Lint、单元测试和 Debug 构建，
 失败时上传检查报告。该工作流不读取任何 Secrets，来自 fork 的 PR 需要维护者在 PR 页面
 批准后才会运行，批准前请重点检查 `.github/` 下的改动。
 
@@ -64,7 +65,6 @@ gh secret set ETA_RELEASE_KEY_PASSWORD
 以下情况会在同一次工作流中生成 Debug APK 和经过签名验证的 Release APK，
 并作为两个可直接下载的 Actions Artifact 保存 1 天：
 
-- 向 `main` 推送提交
 - 推送 `v*` 标签
 - 在 GitHub 的 `Actions > Eta Build` 中手动运行
 
@@ -89,7 +89,7 @@ Windows ACL 仅允许当前用户和 SYSTEM 访问；备份不在 Git 内。
 迁移或重建仓库时继续使用同一证书，并重新设置上述 Secrets。
 不要把证书、密码或备份提交到 Git，也不要每次构建重新生成证书。
 该证书与上游和 Debug 证书不同，不能直接覆盖由其他证书签名的安装。
-`virtual-screen` 分支可以通过手动运行工作流生成签名 Release APK，
+`main` 分支可以通过手动运行工作流生成签名 Release APK，
 无需推送标签或发布公开的 GitHub Release。
 
 正式发布前先更新 `versionCode` 和 `versionName`，然后创建与

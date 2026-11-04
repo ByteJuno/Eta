@@ -1,4 +1,4 @@
-# 后台虚拟屏（3.4.0-vscreen.1）
+# 后台虚拟屏（3.4.0-fork.1）
 
 本 fork 采用上游 3.4.0 的 `agent/virtualdisplay` 引擎。设置中的「后台虚拟屏执行」使用 `agent_virtual_display_enabled`；Root 或 LSPosed system_server 增强可提供虚拟屏。胶囊包含实时预览、画布触控接管和全屏移交；旧 Root 虚拟屏、原生悬浮预览、独立查看页、自动重启及 `virtual_screen` 工具已删除。
 
@@ -19,6 +19,6 @@
 
 ## 升级与兼容
 
-从 3.3.5-vscreen.1 升级时，旧 DataStore `virtual_screen_enabled` 迁移到本地 Prefs：原来开启继续开启，原来关闭继续关闭；已有新 key 优先，不被迁移覆盖。新值落盘成功后删除旧 `virtual_screen_*` 配置，旧悬浮窗、自动重启、熄屏等许可不转移。没有旧值的新安装使用上游默认值。版本为 3.4.0-vscreen.1 / 2026103102，数据库仍为 28。
+从 3.3.5-vscreen.1 升级时，旧 DataStore `virtual_screen_enabled` 迁移到本地 Prefs：原来开启继续开启，原来关闭继续关闭；已有新 key 优先，不被迁移覆盖。新值落盘成功后删除旧 `virtual_screen_*` 配置，旧悬浮窗、自动重启、熄屏等许可不转移。没有旧值的新安装使用上游默认值。版本为 3.4.0-fork.1 / 2026110401，数据库仍为 28。
 
 Root app_process 在 ActivityThread.systemMain 前补初始化 ApplicationSharedMemory，兼容 Android 15+。独立焦点与禁止抢顶层焦点使用上游 flags；独立显示组唤醒锁仅在 displayId 和 groupId 均大于 0 时尝试，ROM 拒绝则安全降级，不唤醒物理主屏。该兼容措施不承诺任意 ROM 的锁屏/熄屏运行；ColorOS 的 Root、LSPosed、预览触控与系统输入仍须真机验收。

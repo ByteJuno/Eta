@@ -1,6 +1,6 @@
 name: Eta Build
 
-# Fork 约定：只从 virtual-screen 构建（手动派发），或从 v* 标签发版。
+# Fork 约定：只从 main 构建（手动派发），或从 v* 标签发版。
 # 其他分支派发时各 job 直接跳过；派发会使用该分支自身的工作流文件，
 # 因此只有含此限制的分支才受约束。
 on:
@@ -20,7 +20,7 @@ jobs:
   # 与打包并行且不接触签名 Secrets；失败不影响 APK 上传，但会阻止发版草稿
   verify:
     name: Lint 与单元测试
-    if: github.ref_type == 'tag' || github.ref_name == 'virtual-screen'
+    if: github.ref_type == 'tag' || github.ref_name == 'main'
     runs-on: ubuntu-latest
     timeout-minutes: 40
     permissions:
@@ -77,7 +77,7 @@ jobs:
 
   build-apks:
     name: 构建 Debug 与 Release APK
-    if: github.ref_type == 'tag' || github.ref_name == 'virtual-screen'
+    if: github.ref_type == 'tag' || github.ref_name == 'main'
     runs-on: ubuntu-latest
     timeout-minutes: 40
 
@@ -218,11 +218,11 @@ jobs:
         if: always()
         run: rm -f "$RUNNER_TEMP/eta-release.jks"
 
-  # virtual-screen 构建的 APK Artifact 只留 1 天；另存为 Release 草稿（仅仓库维护者可见、不创建标签），保留最近 5 个
+  # main 构建的 APK Artifact 只留 1 天；另存为 Release 草稿（仅仓库维护者可见、不创建标签），保留最近 5 个
   dev-draft:
     name: 保存构建草稿
     needs: [verify, build-apks]
-    if: github.ref_type != 'tag' && github.ref_name == 'virtual-screen'
+    if: github.ref_type != 'tag' && github.ref_name == 'main'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -260,7 +260,7 @@ jobs:
             gh release delete "$tag" --repo "$GITHUB_REPOSITORY" --yes
           fi
           apk_name="$(basename "${release_apks[0]}")"
-          notes="virtual-screen 构建 ${GITHUB_SHA::7}，运行 $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID
+          notes="main 构建 ${GITHUB_SHA::7}，运行 $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID
           SHA-256: $(sha256sum "${release_apks[0]}" | cut -d' ' -f1)
           仅供测试，未经真机验收前不要发布。"
           gh release create "$tag" "${release_apks[0]}" \
