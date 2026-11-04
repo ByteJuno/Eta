@@ -172,7 +172,7 @@ class AgentFileOperationsTest {
         } catch (_: InterruptedException) { }
     }
 
-    @Test fun loneSurrogateInEditArgumentIsReportedAsArgumentErrorAndFileIsUntouched() {
+    @Test(timeout = 20_000) fun loneSurrogateInEditArgumentIsReportedAsArgumentErrorAndFileIsUntouched() {
         val file = temporary.newFile("emoji.txt").apply { writeText("状态：\uD83D\uDE00 正常\n") }
         val before = file.readBytes()
         val operations = operations()
@@ -188,7 +188,7 @@ class AgentFileOperationsTest {
         assertTrue(replacement.getString("message").contains("new_text"))
     }
 
-    @Test fun completeEmojiAcrossChunkBoundaryEditsSuccessfully() {
+    @Test(timeout = 20_000) fun completeEmojiAcrossChunkBoundaryEditsSuccessfully() {
         // A 4-byte emoji straddles the 16 000-byte read chunk; the edit must still find and replace it.
         val prefix = "a".repeat(15_998)
         val file = temporary.newFile("boundary.txt").apply { writeText(prefix + "\uD83D\uDE00 tail") }
@@ -198,7 +198,7 @@ class AgentFileOperationsTest {
         assertEquals(prefix + "done", file.readText())
     }
 
-    @Test fun genuinelyInvalidFileReportsTheFailingByteOffset() {
+    @Test(timeout = 20_000) fun genuinelyInvalidFileReportsTheFailingByteOffset() {
         val file = temporary.newFile("bad.bin.txt").apply { writeBytes("ok".toByteArray() + byteArrayOf(0xC3.toByte(), 0x28)) }
         val result = JSONObject(operations().editFile(file.name, "ok", "x"))
 

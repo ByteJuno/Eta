@@ -25,7 +25,7 @@ class ShellProcessSupervisorTest {
         assertNull(process)
     }
 
-    @Test
+    @Test(timeout = 20_000)
     fun groupCleanupPrefersSingleToyboxListingAndKeepsProcFallbackAndExitStatus() {
         val launcher = ShellProcessSupervisor().buildTrackedShellLauncher(
             ownershipFile = File(System.getProperty("java.io.tmpdir"), "eta-cleanup-test.owner"),
@@ -49,7 +49,7 @@ class ShellProcessSupervisorTest {
         assertTrue(launcher.contains("exit ${'$'}eta_status"))
     }
 
-    @Test
+    @Test(timeout = 20_000)
     fun toyboxCleanupKillsOnlyItsOwnGroupInARealShell() {
         val sh = File("/bin/sh").takeIf { it.canExecute() } ?: return
         // Extract just the cleanup functions and drive the toybox branch with a fake toybox that
@@ -72,8 +72,9 @@ class ShellProcessSupervisorTest {
             val script = function.replace("/system/bin/toybox", fake.absolutePath) +
                 "; kill() { echo \"killed ${'$'}*\"; }; ETA_SELF=${'$'}${'$'}; export ETA_SELF; eta_cleanup_toybox_group; echo rc=${'$'}?"
             val process = ProcessBuilder(sh.absolutePath, "-c", script).redirectErrorStream(true).start()
+            // Bound the run: a hung child must fail this test, not stall the whole CI job.
+            assertTrue("cleanup script did not exit", process.waitFor(10, java.util.concurrent.TimeUnit.SECONDS))
             val output = process.inputStream.bufferedReader().readText()
-            process.waitFor()
 
             assertTrue(output, output.contains("killed -9 4242"))
             assertFalse(output, output.contains("9999"))

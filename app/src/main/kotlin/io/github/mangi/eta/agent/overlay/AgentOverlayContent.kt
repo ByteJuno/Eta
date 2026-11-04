@@ -331,9 +331,11 @@ internal fun AgentResultCard(
     var touching by remember { mutableStateOf(false) }
     var interactionTick by remember { mutableIntStateOf(0) }
     val interacting = touching || scroll.isScrollInProgress || dragOffset > 0f
-    LaunchedEffect(visible, interacting, interactionTick) {
-        if (!visible || interacting) return@LaunchedEffect
-        delay(ResultCardAutoDismissMs)
+    // Time to read scales with the answer; a failure stays until dismissed so it is not missed.
+    val autoDismissMs = remember(content, isFailed) { resultCardAutoDismissMs(content, isFailed) }
+    LaunchedEffect(visible, interacting, interactionTick, autoDismissMs) {
+        if (!visible || interacting || autoDismissMs == null) return@LaunchedEffect
+        delay(autoDismissMs)
         close()
     }
     val settledOffset by animateFloatAsState(
@@ -524,4 +526,18 @@ private fun ResultCardActions(
 
 private val ResultCardCorner = 28.dp
 private const val ResultCardExitMs = 200
-private const val ResultCardAutoDismissMs = 8_000L
+private const val ResultCardMinDismissMs = 8_000L
+private const val ResultCardMaxDismissMs = 45_000L
+/** Roughly a comfortable reading pace for mixed Chinese/English text on a phone card. */
+private const val ResultCardCharsPerSecond = 12
+
+/**
+ * How long an untouched result card stays up. Short answers keep the upstream 8 s; longer ones get
+ * reading time capped at 45 s. Failures return null and wait for the user, since a durable result
+ * notification only covers runs the card could not show.
+ */
+internal fun resultCardAutoDismissMs(content: String, failed: Boolean): Long? {
+    if (failed) return null
+    val readingMs = content.trim().length * 1_000L / ResultCardCharsPerSecond
+    return readingMs.coerceIn(ResultCardMinDismissMs, ResultCardMaxDismissMs)
+}

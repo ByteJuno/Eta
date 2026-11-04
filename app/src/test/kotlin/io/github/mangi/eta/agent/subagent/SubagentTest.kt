@@ -31,6 +31,51 @@ import org.robolectric.annotation.Config
 @Config(sdk = [36])
 class SubagentTest {
     @Test
+    fun manySubagentCallsArePlannedIntoWavesNoWiderThanTheConcurrencyCap() {
+        val planner = io.github.mangi.eta.agent.model.AgentToolBatchPlanner
+        val calls = (1..10).map { AgentModelClient.ToolCall("s$it", "subagent", """{"prompt":"p","description":"d"}""") }
+
+        val segments = planner.plan(calls)
+
+        // One parallel segment; AgentLoop runs it in chunks of MAX_CONCURRENT_CALLS.
+        assertEquals(1, segments.size)
+        assertTrue(segments.single().parallel)
+        val waves = segments.single().calls.chunked(planner.MAX_CONCURRENT_CALLS)
+        assertEquals(listOf(4, 4, 2), waves.map { it.size })
+        assertTrue(planner.MAX_CONCURRENT_CALLS <= 4)
+    }
+
+    @Test
+    fun batchCannotSmuggleForbiddenScreenToolsPastAWildcardSubagent() {
+        // A wildcard profile admits "batch" itself, so the guarantee must come from what batch can
+        // reference: its tool enum is projected from the already-filtered catalog.
+        val profile = SubagentProfile.resolve("custom-wildcard", catalog = emptyList())
+        fun schema(name: String) = JSONObject().put("type", "function").put("function",
+            JSONObject().put("name", name).put("parameters", JSONObject().put("type", "object")))
+        val catalog = JSONArray().apply {
+            listOf("read_file", "tap", "observe_screen", "type_text", "launch_app", "browser_use", "present_to_user")
+                .forEach { put(schema(it)) }
+        }
+
+        val scoped = profile.filterTools(catalog)
+        val projected = io.github.mangi.eta.agent.model.AgentBatchToolCatalog.project(scoped)
+        val visible = (0 until projected.length()).map {
+            projected.getJSONObject(it).getJSONObject("function").getString("name")
+        }
+        val batchEnum = projected.getJSONObject(visible.indexOf("batch")).getJSONObject("function")
+            .getJSONObject("parameters").getJSONObject("properties").getJSONObject("calls")
+            .getJSONObject("items").getJSONObject("properties").getJSONObject("tool").getJSONArray("enum")
+            .let { e -> (0 until e.length()).map(e::getString) }
+
+        val screenTools = setOf("tap", "observe_screen", "type_text", "launch_app", "browser_use", "present_to_user")
+        assertTrue(visible.containsAll(listOf("read_file", "batch")))
+        assertTrue(visible.none { it in screenTools })
+        assertEquals(listOf("read_file"), batchEnum)
+        // Even a hand-crafted batch item naming a forbidden tool is refused at execution.
+        screenTools.forEach { assertFalse(it, profile.isToolAllowed(it)) }
+    }
+
+    @Test
     fun wildcardAndExplicitProfilesCannotControlTheForkVirtualDisplay() {
         for (profile in listOf(
             SubagentProfile.resolve("custom-wildcard", catalog = emptyList()),

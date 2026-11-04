@@ -67,6 +67,7 @@ internal object OpenAiResponsesProvider : AgentProviderClient {
             onEvent(ProviderEvent.ResponseHeaders(response.code))
             if (!response.isSuccessful) {
                 throw AgentModelFailure.http(response.code, response.peekBody(16_384).string())
+                    .withRetryAfter(AgentModelFailure.parseRetryAfter(response.header("Retry-After")))
             }
             val assistant = readStreamingResponse(
                 stream = response.body.byteStream(),

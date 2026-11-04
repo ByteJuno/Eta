@@ -72,7 +72,9 @@ internal class AgentModelRetry(
                     )
                 }
                 retries += 1
-                val delayMs = BASE_DELAY_MS shl (retries - 1)
+                // Honour a server-requested wait when it is longer than our backoff; a 429 that asks for
+                // 20 s fails all three 2/4/8 s retries otherwise.
+                val delayMs = maxOf(BASE_DELAY_MS shl (retries - 1), classified.retryAfterMs ?: 0L)
                 onEvent(AgentEvent.ModelRetryScheduled(round, retries, MAX_RETRIES, delayMs.toInt(), classified.code))
                 waitBeforeRetry(controller, delayMs)
                 controller.throwIfCancelled()

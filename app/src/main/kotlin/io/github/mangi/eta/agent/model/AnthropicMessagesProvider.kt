@@ -66,6 +66,7 @@ internal object AnthropicMessagesProvider : AgentProviderClient {
                 if (!response.isSuccessful) {
                     val errorBody = response.peekBody(16_384).string()
                     throw AgentModelFailure.http(response.code, errorBody)
+                        .withRetryAfter(AgentModelFailure.parseRetryAfter(response.header("Retry-After")))
                 }
                 val assistant = readStreamingAssistantMessage(response.body.byteStream(), runController, onEvent)
                 onEvent(ProviderEvent.Completed(assistant.optString("finish_reason").ifBlank { null }))

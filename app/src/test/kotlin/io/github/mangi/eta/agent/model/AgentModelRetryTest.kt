@@ -41,6 +41,43 @@ class AgentModelRetryTest {
     }
 
     @Test
+    fun serverRetryAfterLengthensBackoffButNeverShortensIt() {
+        val delays = mutableListOf<Long>()
+        val retry = AgentModelRetry { _, delay -> delays += delay }
+        var calls = 0
+        // 429 asking for 20 s: each wait must be at least 20 s instead of 2/4/8 s.
+        val limited = AgentModelFailure.http(429, """{"error":{"code":"rate_limit_exceeded"}}""")
+            .withRetryAfter(AgentModelFailure.parseRetryAfter("20"))
+        assertThrows(AgentModelFailure::class.java) {
+            complete(retry, provider { _, _ -> calls++; throw limited })
+        }
+        assertEquals(listOf(20_000L, 20_000L, 20_000L), delays)
+
+        delays.clear()
+        // A shorter hint never makes us retry faster than our own backoff.
+        val brief = AgentModelFailure.http(503, "{}").withRetryAfter(AgentModelFailure.parseRetryAfter("1"))
+        assertThrows(AgentModelFailure::class.java) { complete(retry, provider { _, _ -> throw brief }) }
+        assertEquals(listOf(2_000L, 4_000L, 8_000L), delays)
+    }
+
+    @Test
+    fun retryAfterParsingIsBoundedAndIgnoresGarbage() {
+        val now = 1_700_000_000_000L
+        assertEquals(30_000L, AgentModelFailure.parseRetryAfter("30", now))
+        assertEquals(AgentModelFailure.MAX_RETRY_AFTER_MS, AgentModelFailure.parseRetryAfter("86400", now))
+        val date = java.time.Instant.ofEpochMilli(now + 15_000).atZone(java.time.ZoneOffset.UTC)
+            .format(java.time.format.DateTimeFormatter.RFC_1123_DATE_TIME)
+        assertEquals(15_000L, AgentModelFailure.parseRetryAfter(date, now))
+        val past = java.time.Instant.ofEpochMilli(now - 60_000).atZone(java.time.ZoneOffset.UTC)
+            .format(java.time.format.DateTimeFormatter.RFC_1123_DATE_TIME)
+        assertEquals(0L, AgentModelFailure.parseRetryAfter(past, now))
+        listOf(null, "", "  ", "soon", "-5").forEach { assertEquals(it, null, AgentModelFailure.parseRetryAfter(it, now)) }
+        // Permanent failures keep no retry hint, so they are never delayed or retried.
+        val quota = AgentModelFailure.http(429, """{"error":{"code":"insufficient_quota"}}""").withRetryAfter(5_000)
+        assertEquals(null, quota.retryAfterMs)
+    }
+
+    @Test
     fun cancellationDuringBackoffStopsBeforeAnotherRequest() {
         val controller = AgentRunController()
         var calls = 0

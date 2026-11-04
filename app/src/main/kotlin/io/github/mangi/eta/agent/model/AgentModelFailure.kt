@@ -12,8 +12,32 @@ internal class AgentModelFailure(
     val retryable: Boolean,
     message: String,
     cause: Throwable? = null,
+    /** Server-requested wait from a `Retry-After` header; null when the provider gave none. */
+    val retryAfterMs: Long? = null,
 ) : IllegalStateException(message, cause) {
+    /** Re-attach a provider-requested wait without changing the classification. */
+    fun withRetryAfter(retryAfterMs: Long?): AgentModelFailure =
+        if (retryAfterMs == null || !retryable) this
+        else AgentModelFailure(code, retryable, message.orEmpty(), cause, retryAfterMs)
+
     companion object {
+        /**
+         * Parses `Retry-After` (delta-seconds or HTTP-date, RFC 9110 §10.2.3). Absurd values are
+         * capped so a misbehaving proxy cannot stall a run; past dates collapse to zero.
+         */
+        internal fun parseRetryAfter(value: String?, nowMs: Long = System.currentTimeMillis()): Long? {
+            val text = value?.trim()?.takeIf(String::isNotEmpty) ?: return null
+            val ms = text.toLongOrNull()?.takeIf { it >= 0 }?.let { it * 1_000 }
+                ?: runCatching {
+                    java.time.ZonedDateTime.parse(text, java.time.format.DateTimeFormatter.RFC_1123_DATE_TIME)
+                        .toInstant().toEpochMilli() - nowMs
+                }.getOrNull()?.coerceAtLeast(0)
+                ?: return null
+            return ms.coerceAtMost(MAX_RETRY_AFTER_MS)
+        }
+
+        internal const val MAX_RETRY_AFTER_MS = 60_000L
+
         private val transientStatus = setOf(408, 429, 500, 502, 503, 504, 524, 529)
         private val permanentCodes = setOf(
             "insufficient_quota", "quota_exceeded", "billing_error", "usage_limit_reached",
