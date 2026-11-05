@@ -174,9 +174,9 @@ internal fun ConversationPanePanel(
                 ) {
                     Spacer(Modifier.height(ConversationPanelMetrics.TopInset))
                     Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Icon(painterResource(R.drawable.ic_launcher_foreground), contentDescription = null, tint = Color.Unspecified,
-                            modifier = Modifier.size(40.dp).clip(CircleShape)
-                                .background(MiuixTheme.colorScheme.surfaceContainerHighest).padding(4.dp))
+                        // 头像带自身蓝底（与桌面图标一致），白色团子不能再叠在浅色容器上。
+                        Icon(painterResource(R.drawable.ic_theta_avatar), contentDescription = null, tint = Color.Unspecified,
+                            modifier = Modifier.size(40.dp).clip(CircleShape))
                         Row(
                             modifier = Modifier.weight(1f).padding(start = 10.dp, end = 8.dp),
                             verticalAlignment = Alignment.CenterVertically,
