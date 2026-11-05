@@ -53,7 +53,12 @@ class CodexResponsesRequestTest {
 
     @Test
     fun codexRejectsUnsupportedOverridesAndLeavesApiKeyBehaviorIntact() {
-        listOf("temperature", "top_p", "max_output_tokens", "max_tokens", "background", "conversation").forEach { field ->
+        // max_tokens 是模型设置里的最大输出（OutputTokenLimit），Codex 下忽略而不是报错。
+        val ignoredLimit = OpenAiResponsesProvider.buildRequestJson(
+            config().copy(customBody = listOf(CustomBody("max_tokens", JsonPrimitive(1)))), JSONArray(), tools(),
+        )
+        assertFalse(ignoredLimit.has("max_tokens") || ignoredLimit.has("max_output_tokens"))
+        listOf("temperature", "top_p", "max_output_tokens", "background", "conversation").forEach { field ->
             val failure = assertThrows(IllegalArgumentException::class.java) {
                 OpenAiResponsesProvider.buildRequestJson(
                     config().copy(customBody = listOf(CustomBody(field, JsonPrimitive(1)))), JSONArray(), tools(),

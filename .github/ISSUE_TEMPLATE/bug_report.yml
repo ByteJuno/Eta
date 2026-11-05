@@ -1,0 +1,35 @@
+name: 问题反馈（ByteJuno 定制版）
+description: 只反馈本 fork 构建（版本号带 -fork.N）的问题；上游官方版请到 Mangi-11/Eta 反馈。
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        请勿粘贴 API Key、Cookie、Token、聊天记录或手机号等隐私信息；日志请先脱敏。
+  - type: input
+    id: version
+    attributes:
+      label: Eta 版本
+      description: 设置 → 关于 中的完整版本号，例如 3.4.0-fork.3+abc1234
+    validations:
+      required: true
+  - type: input
+    id: device
+    attributes:
+      label: 设备与系统
+      description: 机型、ROM 与 Android 版本，是否 Root（KernelSU/Magisk）与 LSPosed 框架版本
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: 复现步骤与现象
+      description: 做了什么、期望什么、实际发生了什么；能复现的频率
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: 日志（可选）
+      description: 已脱敏的 logcat 或 Eta 内导出的诊断信息
+      render: text

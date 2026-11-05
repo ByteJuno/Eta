@@ -125,6 +125,33 @@ class SpeechPlaybackTest {
         } finally { controller.stop() }
     }
 
+    @Test fun onFinishedRunsOnlyAfterCompletePlayback() {
+        val output = FakeOutput()
+        var finished = 0
+        val controller = SpeechPlaybackController(context, scope,
+            streamSynthesize = null,
+            synthesize = { _, _, _, audio -> audio(byteArrayOf(1, 2)) },
+            createOutput = { output },
+        )
+        try {
+            controller.speak("short", "简短回答", SpeechSettings(tts = TtsProvider.QWEN), SpeechCredentials(qwenTts = "test-key")) { finished++ }
+            val deadline = System.nanoTime() + 3_000_000_000
+            while (finished == 0 && System.nanoTime() < deadline) {
+                shadowOf(Looper.getMainLooper()).idle()
+                Thread.sleep(1)
+            }
+            assertEquals(1, finished)
+        } finally { controller.stop() }
+    }
+
+    @Test fun stoppedPlaybackDoesNotReportFinished() {
+        var finished = 0
+        playback.speak("answer", "回答正文", SpeechSettings(tts = TtsProvider.QWEN), SpeechCredentials(qwenTts = "test-key")) { finished++ }
+        playback.stop()
+        shadowOf(Looper.getMainLooper()).idle()
+        assertEquals(0, finished)
+    }
+
     @Test fun synthesisIsNotPacedByPlaybackAndPrefetchesBoundedChunks() {
         val writing = java.util.concurrent.CountDownLatch(1)
         val release = java.util.concurrent.CountDownLatch(1)

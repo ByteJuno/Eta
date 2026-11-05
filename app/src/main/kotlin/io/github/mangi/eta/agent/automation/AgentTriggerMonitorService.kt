@@ -1,5 +1,6 @@
 package io.github.mangi.eta.agent.automation
 
+import android.Manifest
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -10,11 +11,16 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
+import android.net.wifi.WifiInfo
+import android.net.wifi.WifiManager
+import android.os.BatteryManager
 import android.os.IBinder
+import org.json.JSONObject
 import io.github.mangi.eta.R
 import io.github.mangi.eta.ui.MainActivity
 
@@ -22,8 +28,14 @@ import io.github.mangi.eta.ui.MainActivity
 internal class AgentTriggerMonitorService : Service() {
     private var networkRegistered = false
     private var receiverRegistered = false
+    private var lastBatteryLevel: Int? = null
     private val receiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
+            when (intent.action) {
+                Intent.ACTION_BATTERY_CHANGED -> return onBatteryChanged(context, intent)
+                BluetoothDevice.ACTION_ACL_CONNECTED, BluetoothDevice.ACTION_ACL_DISCONNECTED ->
+                    return onBluetooth(context, intent)
+            }
             val type = when (intent.action) {
                 Intent.ACTION_USER_PRESENT -> "device_unlocked"
                 Intent.ACTION_SCREEN_ON -> "screen_on"
@@ -38,15 +50,45 @@ internal class AgentTriggerMonitorService : Service() {
                     ) == 1
                 ) "headset_connected" else "headset_disconnected"
 
-                BluetoothDevice.ACTION_ACL_CONNECTED -> "bluetooth_connected"
-                BluetoothDevice.ACTION_ACL_DISCONNECTED -> "bluetooth_disconnected"
                 else -> return
             }
             AgentTaskScheduler.publish(context, type, System.currentTimeMillis().toString())
         }
     }
-    private val networkCallback = object : ConnectivityManager.NetworkCallback() {
-        private val types = mutableMapOf<Network, String>()
+
+    private fun onBluetooth(context: Context, intent: Intent) {
+        val type = if (intent.action == BluetoothDevice.ACTION_ACL_CONNECTED) "bluetooth_connected" else "bluetooth_disconnected"
+        val device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE, BluetoothDevice::class.java)
+        // 读取名称需要 BLUETOOTH_CONNECT；未授权时仍发布事件，只是不能按设备名过滤。
+        val name = if (context.checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED) {
+            try { device?.name } catch (_: SecurityException) { null }
+        } else {
+            null
+        }?.trim().orEmpty()
+        val data = JSONObject().apply { if (name.isNotEmpty()) put("deviceName", name.take(100)) }
+        AgentTaskScheduler.publish(context, type, System.currentTimeMillis().toString(), data)
+    }
+
+    /** BATTERY_CHANGED 是粘性广播：注册时立即收到一次，只用来记录起点。 */
+    private fun onBatteryChanged(context: Context, intent: Intent) {
+        val raw = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
+        val scale = intent.getIntExtra(BatteryManager.EXTRA_SCALE, 100)
+        if (raw < 0 || scale <= 0) return
+        val level = raw * 100 / scale
+        val previous = lastBatteryLevel
+        lastBatteryLevel = level
+        if (previous == null || previous == level) return
+        AgentTaskScheduler.publish(
+            context,
+            "battery_level",
+            "$previous->$level:${System.currentTimeMillis()}",
+            JSONObject().put("level", level).put("previous", previous),
+        )
+    }
+
+    // FLAG_INCLUDE_LOCATION_INFO 让已获精确位置授权时 WifiInfo 带真实 SSID；未授权时为 <unknown ssid>。
+    private val networkCallback = object : ConnectivityManager.NetworkCallback(FLAG_INCLUDE_LOCATION_INFO) {
+        private val types = mutableMapOf<Network, NetworkIdentity>()
         override fun onCapabilitiesChanged(network: Network, capabilities: NetworkCapabilities) {
             val transport = when {
                 capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> "wifi"
@@ -54,25 +96,23 @@ internal class AgentTriggerMonitorService : Service() {
                 capabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) -> "ethernet"
                 else -> "other"
             }
-            if (types.put(
-                    network,
-                    transport
-                ) != transport
-            ) AgentTaskScheduler.publish(
+            val ssid = (capabilities.transportInfo as? WifiInfo)?.ssid?.let(::normalizeSsid)
+            val identity = NetworkIdentity(transport, ssid)
+            if (types.put(network, identity) != identity) AgentTaskScheduler.publish(
                 this@AgentTriggerMonitorService,
                 "network_connected",
                 "$network:$transport",
-                org.json.JSONObject().put("transport", transport)
+                identity.toJson(),
             )
         }
 
         override fun onLost(network: Network) {
-            val transport = types.remove(network) ?: "other"
+            val identity = types.remove(network) ?: NetworkIdentity("other", null)
             AgentTaskScheduler.publish(
                 this@AgentTriggerMonitorService,
                 "network_disconnected",
                 network.toString(),
-                org.json.JSONObject().put("transport", transport)
+                identity.toJson(),
             )
         }
     }
@@ -115,7 +155,8 @@ internal class AgentTriggerMonitorService : Service() {
                 Intent.ACTION_BATTERY_OKAY,
                 Intent.ACTION_HEADSET_PLUG,
                 BluetoothDevice.ACTION_ACL_CONNECTED,
-                BluetoothDevice.ACTION_ACL_DISCONNECTED
+                BluetoothDevice.ACTION_ACL_DISCONNECTED,
+                Intent.ACTION_BATTERY_CHANGED,
             ).forEach(::addAction)
         }
         registerReceiver(receiver, filter, Context.RECEIVER_EXPORTED)
@@ -138,8 +179,20 @@ internal class AgentTriggerMonitorService : Service() {
         super.onDestroy()
     }
 
+    private data class NetworkIdentity(val transport: String, val ssid: String?) {
+        fun toJson(): JSONObject = JSONObject().put("transport", transport).apply {
+            if (ssid != null) put("ssid", ssid)
+        }
+    }
+
     companion object {
         private const val CHANNEL = "eta_automation_triggers"
+
+        /** WifiInfo.ssid 带引号；无授权或未知时返回 null。 */
+        internal fun normalizeSsid(raw: String): String? =
+            raw.removeSurrounding("\"").trim()
+                .takeUnless { it.isEmpty() || it == WifiManager.UNKNOWN_SSID }
+                ?.take(64)
         @Volatile
         var isRunning = false
             private set

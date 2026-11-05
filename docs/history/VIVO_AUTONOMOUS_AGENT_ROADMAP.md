@@ -1,4 +1,6 @@
-# vivo 自主助理开发记录
+# vivo 自主助理开发记录（历史）
+
+> 这是 lejw0925/Eta-vivo 时期的开发记录，仅作历史参考。本 fork 已移除 vivo 专属接入（小 V 接管、个人上下文、原子岛通知），文中链接的 VIVO_* 文档不再维护；自动任务、经验学习与虚拟屏的现状以对应文档为准。
 
 沿用 Eta 的 Kotlin / Compose、Room / DataStore、Agent Runtime、固定 Root 执行器与技能注册表架构。远端为 [lejw0925/Eta-vivo](https://github.com/lejw0925/Eta-vivo)，保留上游历史与许可证。
 

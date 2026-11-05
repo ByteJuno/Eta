@@ -1,5 +1,6 @@
 package io.github.mangi.eta.ui.app
 
+import io.github.mangi.eta.agent.automation.SharedContentTrigger
 import io.github.mangi.eta.agent.model.AgentContextSnapshot
 
 import android.content.ContentResolver
@@ -1830,6 +1831,7 @@ internal class AgentAppState(
     }
 
     fun acceptSharedContent(request: IncomingShareRequest) {
+        SharedContentTrigger.publish(appContext, request)
         val canReuseCurrentDraft = homeState.isConversationLoaded &&
             homeState.roleplay == null &&
             homeState.messages.isEmpty() &&

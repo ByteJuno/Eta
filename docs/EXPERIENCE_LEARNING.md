@@ -25,6 +25,6 @@ Eta 在成功完成普通任务后启动独立复盘，沿用原任务的模型�
 
 ## 验证与参考
 
-JVM 测试覆盖权限名单、角色会话边界、证据裁剪、版本冲突、资源保留和取消。vivo Android 16 真机使用本机模拟模型验证了「任务完成 → 后台追加记忆 → 注册用户技能」，并确认测试记忆、技能和模型选择全部恢复；这验证执行链路，不代表真实模型的总结质量。
+JVM 测试覆盖权限名单、角色会话边界、证据裁剪、版本冲突、资源保留和取消。lejw 分支时期曾在 vivo Android 16 真机上用本机模拟模型验证「任务完成 → 后台追加记忆 → 注册用户技能」，并确认测试记忆、技能和模型选择全部恢复；这验证执行链路，不代表真实模型的总结质量。
 
 参考 Hermes 的 [后台复盘](https://github.com/NousResearch/hermes-agent/blob/6590f13a1ba21b18224a0f53ef2ead004b5fa7d6/agent/background_review.py) 与 [技能管理](https://github.com/NousResearch/hermes-agent/blob/6590f13a1ba21b18224a0f53ef2ead004b5fa7d6/tools/skill_manager_tool.py)。Eta 的实现使用现有 Android Runtime、记忆存储和技能事务。

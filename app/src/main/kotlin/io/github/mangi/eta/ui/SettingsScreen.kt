@@ -166,6 +166,7 @@ private fun SettingsPageContent(
     var hasConnectedFramework by remember { mutableStateOf(enhancementHistory.hasConnected) }
     var hasUsedSystemizer by remember { mutableStateOf(enhancementHistory.hasUsedSystemizer) }
     var showSystemizerDialog by remember { mutableStateOf(false) }
+    var showUsageStats by remember { mutableStateOf(false) }
     var installingSystemizer by remember { mutableStateOf(false) }
 
     // 悬浮窗权限状态：授权后从系统设置返回时（ON_RESUME）刷新。
@@ -250,6 +251,7 @@ private fun SettingsPageContent(
             override fun onServiceStateChanged(service: io.github.libxposed.service.XposedService?) {
                 prefs = Prefs.remotePreferencesForUi(service)
                 prefs?.let { connected ->
+                    enhancementHistory.restoreMissingInto(connected)
                     enhancementHistory.captureConnected(connected)
                     hasConnectedFramework = true
                 }
@@ -286,6 +288,17 @@ private fun SettingsPageContent(
                         },
                         onClick = { onNavigate(AppRoute.ModelProviders) },
                     )
+                    ArrowPreference(
+                        title = stringResource(R.string.usage_stats_title),
+                        summary = stringResource(R.string.usage_stats_summary),
+                        startAction = {
+                            SettingsIcon(
+                                icon = Icons.Rounded.Dashboard,
+                                tint = SettingsIconColors.Blue,
+                            )
+                        },
+                        onClick = { showUsageStats = true },
+                    )
                     SwitchPref(
                         context = context,
                         prefs = agentPrefs,
@@ -307,6 +320,15 @@ private fun SettingsPageContent(
                         title = stringResource(R.string.settings_auto_compaction),
                         key = Prefs.Keys.AGENT_AUTO_COMPACTION_ENABLED,
                         icon = Icons.Rounded.Layers,
+                        iconTint = SettingsIconColors.Blue,
+                    )
+                    SwitchPref(
+                        context = context,
+                        prefs = agentPrefs,
+                        title = stringResource(R.string.settings_lazy_tool_groups),
+                        summary = stringResource(R.string.settings_lazy_tool_groups_summary),
+                        key = Prefs.Keys.AGENT_LAZY_TOOL_GROUPS,
+                        icon = Icons.Rounded.Inventory2,
                         iconTint = SettingsIconColors.Blue,
                     )
                     ArrowPreference(
@@ -831,6 +853,10 @@ private fun SettingsPageContent(
                     )
                 }
             }
+        }
+
+        if (showUsageStats) {
+            io.github.mangi.eta.ui.components.UsageStatsDialog(onDismiss = { showUsageStats = false })
         }
 
         SystemizerConfirmDialog(

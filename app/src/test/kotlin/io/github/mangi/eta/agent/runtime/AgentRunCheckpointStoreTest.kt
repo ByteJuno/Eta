@@ -3,6 +3,9 @@ package io.github.mangi.eta.agent.runtime
 import android.content.Context
 import io.github.mangi.eta.agent.model.AgentModelClient
 import io.github.mangi.eta.data.db.EtaDatabase
+import io.github.mangi.eta.data.db.RuntimeInFlightEventEntity
+import io.github.mangi.eta.data.db.RuntimeRunDao
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -36,6 +39,38 @@ class AgentRunCheckpointStoreTest {
         recorder.seal()
         val restored = AgentRunCheckpointStore.list(context).single()
         assertEquals(listOf(textDelta("正文与引用")), restored.events)
+    }
+
+    @Test
+    fun oversizedDeltaIsChunkedAndRestoredIntact() {
+        val request = request("run-big")
+        AgentRunCheckpointRecorder.create(context, request)!!.seal()
+        // 生图模型把 base64 当作正文流回（上游 #230）：单条事件超过 CursorWindow 2 MB。
+        val huge = "A".repeat(2_400_000)
+        AgentRunCheckpointStore.append(context, request.runId, 0, textDelta(huge))
+
+        val stored = runBlocking {
+            EtaDatabase.get(context).runtimeRunDao().inFlightRunRows().single().events.single()
+        }
+        assertTrue(stored.eventJson.length < 100)
+        assertEquals(listOf(textDelta(huge)), AgentRunCheckpointStore.list(context).single().events)
+    }
+
+    @Test
+    fun legacyOversizedEventRowIsDroppedInsteadOfCrashingRecovery() {
+        val request = request("run-legacy")
+        AgentRunCheckpointRecorder.create(context, request)!!.seal()
+        AgentRunCheckpointStore.append(context, request.runId, 0, textDelta("保留"))
+        runBlocking {
+            EtaDatabase.get(context).runtimeRunDao().insertInFlightEvent(
+                RuntimeInFlightEventEntity(
+                    runId = request.runId,
+                    sortIndex = 1,
+                    eventJson = "x".repeat(RuntimeRunDao.MAX_LEGACY_EVENT_CHARS + 1),
+                ),
+            )
+        }
+        assertEquals(listOf(textDelta("保留")), AgentRunCheckpointStore.list(context).single().events)
     }
 
     @Test

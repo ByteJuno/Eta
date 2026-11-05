@@ -55,6 +55,14 @@ internal class AgentContextSummarizer(
                 throw invalidSummary("TOOL_CALL")
             }
         }
+        // 摘要校验失败也已计费，先记账。
+        usage?.let {
+            io.github.mangi.eta.agent.runtime.AgentUsageLedger.record(
+                summaryConfig(config).model,
+                it,
+                cacheExcludedFromInput = provider.capabilities.endpoint == EndpointKind.ANTHROPIC_MESSAGES,
+            )
+        }
         controller.throwIfCancelled()
         val summary = response.assistantMessage.optString("content").trim()
         val invalid = when {

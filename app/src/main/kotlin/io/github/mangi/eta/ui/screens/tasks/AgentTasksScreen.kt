@@ -319,6 +319,11 @@ private fun triggerSummary(context: Context, rule: JSONObject): String =
                 if (days.isEmpty()) "" else " · ${days.joinToString(", ")}"
         }
         "interval" -> context.getString(R.string.automation_interval, rule.optLong("seconds") / 60)
+        "battery_level" -> if (rule.has("below")) {
+            context.getString(R.string.automation_battery_below, rule.optInt("below"))
+        } else {
+            context.getString(R.string.automation_battery_above, rule.optInt("above"))
+        }
         else -> eventLabel(context, rule.optString("type"))
     }
 
@@ -344,6 +349,8 @@ internal fun eventLabel(context: Context, type: String): String {
         "memory_updated" -> R.string.automation_event_memory_updated
         "task_completed" -> R.string.automation_event_task_completed
         "task_failed" -> R.string.automation_event_task_failed
+        "shared_content" -> R.string.automation_event_shared_content
+        "battery_level" -> R.string.automation_event_battery_level
         else -> return context.getString(R.string.automation_event, type)
     }
     return context.getString(label)
@@ -357,20 +364,28 @@ private fun triggerFilters(context: Context, rule: JSONObject): String {
         "textContains" to R.string.automation_filter_text,
         "taskId" to R.string.automation_filter_task,
         "transport" to R.string.automation_filter_transport,
+        "ssid" to R.string.automation_filter_ssid,
+        "deviceName" to R.string.automation_filter_device,
+        "kind" to R.string.automation_filter_kind,
     ).mapNotNull { (key, label) ->
         filters.optString(key).takeIf { it.isNotBlank() }?.let { context.getString(label, it) }
     }.joinToString("\n")
 }
 
 private fun triggerConditions(context: Context, rule: JSONObject): String {
-    val conditions = rule.optJSONObject("conditions") ?: return ""
-    return listOf(
+    fun labels(conditions: JSONObject): List<String> = listOf(
         Triple("charging", R.string.automation_condition_charging, R.string.automation_condition_not_charging),
         Triple("unlocked", R.string.automation_condition_unlocked, R.string.automation_condition_locked),
         Triple("networkConnected", R.string.automation_condition_online, R.string.automation_condition_offline),
     ).mapNotNull { (key, yes, no) ->
         if (conditions.has(key)) context.getString(if (conditions.optBoolean(key)) yes else no) else null
-    }.joinToString(" · ")
+    }
+    val all = rule.optJSONObject("conditions")?.let(::labels).orEmpty().joinToString(" · ")
+    val any = rule.optJSONObject("conditionsAny")?.let(::labels).orEmpty()
+        .takeIf { it.isNotEmpty() }
+        ?.let { context.getString(R.string.automation_conditions_any, it.joinToString(" / ")) }
+        .orEmpty()
+    return listOf(all, any).filter(String::isNotEmpty).joinToString(" · ")
 }
 
 private fun formatTime(context: Context, time: Long): String =

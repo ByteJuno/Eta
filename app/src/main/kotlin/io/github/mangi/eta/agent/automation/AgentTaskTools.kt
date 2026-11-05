@@ -12,6 +12,16 @@ internal class AgentTaskTools(context: Context) {
     private val context = context.applicationContext
     private val dao get() = EtaDatabase.get(context).agentTaskDao()
 
+    private suspend fun requireNoCycle(taskId: String, rule: JSONObject) {
+        val enabled = dao.tasks().filter { it.enabled && it.id != taskId }
+            .associate { it.id to JSONObject(it.triggerJson) }
+        AgentTaskRules.findDependencyCycle(enabled, taskId, rule)?.let { cycle ->
+            val names = dao.tasks().associate { it.id to it.name }
+            val chain = (cycle + taskId).joinToString(" ← ") { names[it] ?: "新任务" }
+            throw IllegalArgumentException("任务结果触发会形成循环：$chain；请改用其他上游或停用环上的任务")
+        }
+    }
+
     fun execute(name: String, args: JSONObject): String = runBlocking {
         try {
             val now = System.currentTimeMillis()
@@ -42,7 +52,10 @@ internal class AgentTaskTools(context: Context) {
                         createdAt = now,
                         updatedAt = now
                     )
-                    if (task.enabled) AgentTaskScheduler.requireTriggerAvailable(context, rule)
+                    if (task.enabled) {
+                        AgentTaskScheduler.requireTriggerAvailable(context, rule)
+                        requireNoCycle(task.id, rule)
+                    }
                     require(task.nextRunAt == null || task.nextRunAt > now) { "首次时间需要在未来" }
                     dao.insertTask(task)
                     AgentTaskScheduler.refresh(context)
@@ -96,7 +109,10 @@ internal class AgentTaskTools(context: Context) {
                         ).toInt(),
                         updatedAt = maxOf(now, old.updatedAt + 1)
                     )
-                    if (changed.enabled) AgentTaskScheduler.requireTriggerAvailable(context, rule)
+                    if (changed.enabled) {
+                        AgentTaskScheduler.requireTriggerAvailable(context, rule)
+                        requireNoCycle(changed.id, rule)
+                    }
                     if (changed.enabled && (args.has("trigger") || !old.enabled)) {
                         require(changed.nextRunAt == null || changed.nextRunAt > now) { "首次时间需要在未来" }
                     }
