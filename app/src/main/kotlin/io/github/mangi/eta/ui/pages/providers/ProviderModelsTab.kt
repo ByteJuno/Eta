@@ -75,6 +75,7 @@ import io.github.mangi.eta.R
 import io.github.mangi.eta.agent.auth.ProviderAuthException
 import io.github.mangi.eta.data.model.Model
 import io.github.mangi.eta.data.model.ModelReasoningCapabilities
+import io.github.mangi.eta.data.model.OutputTokenLimit
 import io.github.mangi.eta.data.model.ProviderAuthModes
 import io.github.mangi.eta.data.model.GeminiProviderSetting
 import io.github.mangi.eta.data.provider.GeminiModelCapabilities
@@ -834,7 +835,11 @@ private fun ModelEditDialog(
                 .orEmpty() + ReasoningEffort.DEFAULT
         )
     }
+    var maxOutputTokensText by remember(model.id, isNew) {
+        mutableStateOf(OutputTokenLimit.read(model.customBody)?.toString().orEmpty())
+    }
     val contextError = contextWindowInputError(contextWindowOverrideText)
+    val maxOutputValid = OutputTokenLimit.isValidInput(maxOutputTokensText)
     val geminiCapabilities = if (nativeGemini) GeminiModelCapabilities.requestReasoningCapabilities(modelId) else null
 
     fun resetAutomaticReasoning() {
@@ -852,6 +857,7 @@ private fun ModelEditDialog(
         contextWindowOverride = contextWindowOverrideText.trim()
             .takeIf(String::isNotEmpty)
             ?.toInt(),
+        customBody = OutputTokenLimit.write(model.customBody, maxOutputTokensText.trim().toIntOrNull()),
         reasoningOverride = reasoningEnabled.takeIf { reasoningOverrideActive && geminiCapabilities == null },
         reasoningCapabilitiesOverride = if (reasoningOverrideActive && reasoningEnabled && geminiCapabilities == null) {
             val canDisable = ReasoningEffort.OFF in selectedReasoningEfforts
@@ -947,6 +953,27 @@ private fun ModelEditDialog(
                     } else {
                         MiuixTheme.colorScheme.onSurfaceVariantSummary
                     },
+                    modifier = Modifier.padding(start = 4.dp, top = 8.dp),
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                TextField(
+                    value = maxOutputTokensText,
+                    onValueChange = { value -> maxOutputTokensText = value.filter(Char::isDigit).take(7) },
+                    label = stringResource(R.string.provider_max_output_tokens),
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Number,
+                        imeAction = ImeAction.Done,
+                    ),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Text(
+                    text = stringResource(
+                        if (maxOutputValid) R.string.provider_max_output_tokens_hint
+                        else R.string.provider_max_output_tokens_invalid,
+                    ),
+                    style = MiuixTheme.textStyles.footnote2,
+                    color = if (maxOutputValid) MiuixTheme.colorScheme.onSurfaceVariantSummary else StatusError,
                     modifier = Modifier.padding(start = 4.dp, top = 8.dp),
                 )
                 Spacer(modifier = Modifier.height(16.dp))
@@ -1080,7 +1107,8 @@ private fun ModelEditDialog(
             confirmEnabled = !isSaving &&
                 displayName.isNotBlank() &&
                 modelId.isNotBlank() &&
-                contextError == null,
+                contextError == null &&
+                maxOutputValid,
             cancelEnabled = !isSaving,
             onCancel = onDismiss,
             onConfirm = { onSubmit(updated()) },

@@ -1,5 +1,6 @@
 package io.github.mangi.eta.agent.model
 
+import io.github.mangi.eta.data.model.OutputTokenLimit
 import io.github.mangi.eta.data.model.ReasoningEffort
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -43,6 +44,9 @@ internal object GeminiInteractionsRequest {
         if (converted.length() > 0) body.put("tools", converted)
 
         val generation = body.optJSONObject("generation_config") ?: JSONObject()
+        body.remove(OutputTokenLimit.CUSTOM_BODY_KEY)?.let { limit ->
+            if (!generation.has("max_output_tokens")) generation.put("max_output_tokens", limit)
+        }
         // 工具选择与思考档位由运行配置决定，自定义 JSON 不能绕过入口能力与开关。
         generation.remove("tool_choice")
         generation.remove("thinking_level")

@@ -947,6 +947,9 @@
   <string name="provider_context_window_invalid">Enter a positive integer</string>
   <string name="provider_context_window_value">About %1$s tokens</string>
   <string name="provider_context_window_usage">Conversations compact automatically as they approach this size</string>
+  <string name="provider_max_output_tokens">Max output tokens</string>
+  <string name="provider_max_output_tokens_hint">Leave blank to use the provider default. Thinking tokens usually count toward this limit.</string>
+  <string name="provider_max_output_tokens_invalid">Enter a whole number from 1 to 1000000</string>
   <plurals name="provider_models_added">
     <item quantity="one">Added %d model</item>
     <item quantity="other">Added %d models</item>
@@ -1205,6 +1208,8 @@
   <string name="mcp_token_configured">Bearer token configured</string>
   <string name="mcp_no_authentication">No authentication</string>
   <string name="mcp_tools_count">Tools · %1$d</string>
+  <string name="mcp_run_limit_warning">%1$d tools are enabled, but each run exposes at most %2$d. Tools beyond the limit are skipped in server order; disable ones you rarely use.</string>
+  <string name="mcp_catalog_truncated">The server lists more tools than Eta keeps (%1$d shown). Remaining tools are not listed; split them across servers or reduce descriptions.</string>
   <string name="mcp_no_tools">No compatible tools</string>
   <string name="mcp_refresh_tools_hint">Refresh after the server publishes tools</string>
   <string name="mcp_delete_server">Delete server</string>

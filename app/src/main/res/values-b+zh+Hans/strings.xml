@@ -937,6 +937,9 @@
   <string name="provider_context_window_invalid">请输入正整数</string>
   <string name="provider_context_window_value">约 %1$s tokens</string>
   <string name="provider_context_window_usage">对话接近这个长度时会自动压缩</string>
+  <string name="provider_max_output_tokens">最大输出 tokens</string>
+  <string name="provider_max_output_tokens_hint">留空则使用服务商默认值；思考内容通常也计入这个上限</string>
+  <string name="provider_max_output_tokens_invalid">请输入 1 到 1000000 之间的整数</string>
   <plurals name="provider_models_added">
     <item quantity="other">已添加 %d 个模型</item>
   </plurals>
@@ -1189,6 +1192,8 @@
   <string name="mcp_token_configured">已配置 Bearer Token</string>
   <string name="mcp_no_authentication">未配置身份认证</string>
   <string name="mcp_tools_count">工具 · %1$d</string>
+  <string name="mcp_run_limit_warning">已启用 %1$d 个工具，但每轮最多提供 %2$d 个；超出部分按服务器顺序跳过，建议关闭不常用的工具。</string>
+  <string name="mcp_catalog_truncated">服务器提供的工具超出 Eta 的保存上限（当前显示 %1$d 个），其余工具未列出；可拆分到多个服务器或精简描述。</string>
   <string name="mcp_no_tools">没有兼容工具</string>
   <string name="mcp_refresh_tools_hint">服务器发布工具后可在此刷新</string>
   <string name="mcp_delete_server">删除服务器</string>
