@@ -1,12 +1,12 @@
 # ETA / Theta 手机 Agent 插件架构设计草案
 
-状态：v0.2 待评审，未实现。日期：2026-11-05。核对源码基线：`f49fa20`。
+状态：v0.3 本地实现记录与后续设计，未完成发布验收。日期：2026-11-05。原调研基线：`f49fa20`；本节现状以本轮未提交工作区为准，不代表已发布 APK。
 
 本次修订依据：Operit、Home Assistant、Pi、OpenClaw、DroidRun/Mobilerun 的官方仓库及文档调研。未安装运行这些项目，未做性能或成功率对比；参考链接与证据边界见第 15 节。
 
-v0.2 替代 v0.1 的实施顺序：先验证外部能力无需修改 APK 即可接入、同服务多连接可区分且可停用，再迁移内置日历。此前“先做日历兼容路由”的建议不再作为下一步实施指令。本次仅审核并提交设计文档；第 16 节产品决策尚待确认，不授权实施业务代码。
+实施顺序仍是先外部 MCP 接入与连接授权，再接入内置日历。用户已确认 D1 个人技术用户、D2 连接内逐工具授权自动执行，并授权持续本地实现，随后明确允许本地 Gradle 验证；不自动提交推送、不切换分支。本轮 P0–P5 均已有代码切片，但代码接入不等于各阶段退出条件已满足。
 
-本文中的新类、数据表、事件和错误码均为拟议接口，不代表现有功能。保留 Kotlin、Compose、现有多 Provider 接入与 Agent Runtime；不新增云服务依赖，不更换模型，不改包名。第一阶段只在现有 app 模块中划分包边界。
+本文区分“已接入代码”“未验证”“未来设计”。保留 Kotlin、Compose、现有多 Provider 与 Agent Runtime，不新增云服务依赖、不更换模型或包名。已按用户授权完成本地编译、定向测试与 Lint；完整单测仍有 54 项失败，均在未改造基线复现。真机与真实非定制 MCP 服务尚未验收，详见 [本地验证记录](PLUGIN_VALIDATION.md)，不得作为全套测试通过或产品发布保证。
 
 ## 1. 目标与非目标
 
@@ -22,7 +22,7 @@ v0.2 替代 v0.1 的实施顺序：先验证外部能力无需修改 APK 即可�
 
 ## 2. 已核对的现状
 
-源码路径均相对 `app/src/main/kotlin/io/github/bytejuno/theta/`。
+源码路径均相对 `app/src/main/kotlin/io/github/bytejuno/theta/`。下表保留原调研定位（行号已随实现变化），最新实现差异见第 4.3、8、12 节。角色只读、后台授权及账本能力以本文明确限定为准。
 
 | 现有位置 | 已核对行为 | 设计处理 |
 |---|---|---|
@@ -35,9 +35,9 @@ v0.2 替代 v0.1 的实施顺序：先验证外部能力无需修改 APK 即可�
 | `agent/model/AgentToolBatchPlanner.kt:14` | 只读白名单并行，其他工具形成屏障 | 第一版保留白名单，不相信第三方自报并行安全 |
 | `agent/phone/PhoneAppTools.kt:14` | 日历支持普通权限路径及 Root 路径 | 保留实际设备适配，不强制改变路径优先级 |
 | `agent/phone/CalendarOperations.kt:156` | applyBatch 写入后按事件 ID 回读验证 | 复用验证；不是跨宿主日志的原子提交 |
-| `agent/mcp/McpRunContext.kt:20` | 工具、配置、凭据按 run 冻结；设置变更下次 run 生效 | 明确现状；实时停用必须新增执行前接纳机制 |
-| `agent/mcp/McpServerManager.kt:12` | 刷新取旧启用集与新目录交集 | 保留新发现工具不自动启用 |
-| `data/repository/McpServerRepository.kt:33` | Room 配置和独立凭据存储，失败补偿 | 不复制 MCP token，不声称跨存储事务原子性 |
+| `agent/mcp/McpRunContext.kt` | 原子配置凭据快照；执行前权威接纳；监听失效尽力关闭 | 不把冻结目录当实时授权，不保证取消远端副作用 |
+| `agent/mcp/McpServerManager.kt` | 语义摘要比对保留授权，刷新提交校验版本 | 新工具关闭，定义变化撤销授权 |
+| `data/repository/McpServerRepository.kt` | Room 配置与独立密钥存储，由持久屏障和统一锁协调 | 不复制 token，不声称跨存储原子事务 |
 | `ui/model/ToolCapabilityProjection.kt:9` | 工具卡依赖静态 requirements，未知 ID 抛错 | 新建通用插件展示投影，不直接灌入任意插件 ID |
 | `agent/runtime/AgentRunCheckpointStore.kt:32` | 检查点 start 有特定 UI handoff 条件 | 不能假设所有入口已有统一持久操作日志 |
 
@@ -119,20 +119,25 @@ v1 的 PluginManifest 是宿主内部描述格式，不要求现有 MCP 服务�
 
 配置借鉴静态清单模式：通过宿主已知的 schema 与字段提示生成表单，先校验再连接，不执行服务端提供的脚本。首版只支持当前 MCP 所需字段及现有认证方式；通用 OAuth、动态页面和任意 JSON Schema UI 都不在本版承诺中。秘密字段仅保存引用，配置 schema 校验也不替代工具执行边界的参数解析。
 
-### 4.3 最小代码边界（接口规格，非已实现代码）
+### 4.3 当前代码边界（已接入，未完成运行验收）
 
 | 对象 | 接口职责 |
 |---|---|
-| PluginProvider | 提供 descriptor，按 run 打开受限执行会话 |
-| PluginRegistry | 注册提供者、查重、生成不可变 RunToolBindings |
-| PluginRunSession | 同步 execute(ToolCall): ToolResult；close 幂等 |
-| PluginRoutingExecutor | 实现现有 ToolExecutor；按本轮 binding 路由，不按字符串前缀猜测 |
-| PluginPolicy | 组合旧工具开关、插件状态、场景限制、系统能力和确认策略 |
-| PluginAdmissionCoordinator | 管理连接代次、停用与调用接纳的先后顺序 |
-| PluginRepository | 管理内置插件状态和授权；MCP 配置仍由原仓库持有 |
-| PluginCatalogProjection | 生成模型目录与插件 UI 的各自视图 |
+| PluginToolIdentity / PluginToolDescriptor | 三层身份及模型工具描述 |
+| PluginRegistry / RunToolBindings | 名称冲突、保留名校验及本轮冻结绑定 |
+| McpPluginCatalog / BuiltinCalendarAdapter | MCP 与七项日历工具的目录适配；不重复发布旧日历 schema |
+| PluginRoutingExecutor | 同步 ToolExecutor 路由；失败不回落为其他提供者 |
+| McpRunSnapshot / McpToolExecutor | 原子配置凭据快照、运行客户端、接纳检查及失效后的尽力关闭 |
+| McpServerRepository / McpRepositoryStore | 唯一 MCP 配置与授权、revision、同锁 withAdmission、凭据更新屏障 |
+| PluginCallJournal | 独立 SQLite 调用归属及不确定状态账本，不保存原始参数/结果/token |
+| CalendarRuntimeAdapter / CalendarWriteCoordinator | 宿主只读 prepare、逐次确认、执行前复核及日历状态机 |
+| CalendarApprovalBridge / CalendarWriteToolExecutor | 前台确认桥接及写工具执行集成 |
+| CalendarSqliteOperationLedger / CalendarAesGcmEvidenceCodec | 独立 SQLite 日历账本、Keystore 绑定加密证据及 owner 恢复 |
+| McpConnectionUiState / 扩展页面 | 基于权威 MCP 状态的管理投影，非第二授权存储 |
 
-`PluginRunSession` 第一版保持现有同步协议，不趁此重写所有工具为 suspend。耗时操作继续在 Runtime 工作线程执行；禁止在主线程等待网络/数据库。close 对正在进行的 I/O 做尽力取消，不能将关闭视为回滚。
+未单独实现通用 PluginProvider、PluginRunSession、PluginPolicy、PluginAdmissionCoordinator 或 PluginRepository 类；其当前职责由上述对象及既有入口策略承担。通用第三方 SDK/清单加载器仍是未来范围，不应把拟议类名当作现有接口。
+
+执行适配保留现有同步 ToolExecutor 协议，工作线程桥接 suspend 接纳入口；接纳锁内仅查询权威状态及登记，不持锁执行网络。耗时操作不得在主线程等待。close 对正在进行的 I/O 做尽力取消，不能将关闭视为回滚。
 
 ### 4.4 运行上下文
 
@@ -146,7 +151,7 @@ v1 的 PluginManifest 是宿主内部描述格式，不要求现有 MCP 服务�
 
 可执行 = 本轮目录绑定有效 ∩ 插件启用 ∩ 单工具启用 ∩ 旧工具组开关 ∩ 当前入口约束 ∩ 所需系统能力 ∩ 本次必要确认。
 
-新插件不能通过注册绕过：自动任务限制、角色会话只读限制、子代理继承限制、主屏确认、共享交互租约、工具暂停与取消。
+新插件不能通过注册绕过既有入口约束、子代理继承限制、主屏确认、共享交互租约、工具暂停与取消。角色会话现有“只读”仅限制现实记忆写入，不是对全部设备/MCP 工具的只读沙箱；不能据此宣称角色会话不会执行其他写操作。当前后台入口明确拒绝 MCP，没有实现后台独立逐工具授权。
 
 系统授权、插件启用、操作确认是不同层。安装插件不会自动申请 Android 权限；模型工具也不能修改自己的授权。
 
@@ -165,13 +170,13 @@ v1 的 PluginManifest 是宿主内部描述格式，不要求现有 MCP 服务�
 
 协调器只锁短时状态与接纳，不在持锁期间等待网络或用户确认。确认结束后再次检查 run、权限、参数摘要和连接代次。
 
-MCP 目前是 run 快照权限，实施上述语义是新增行为，不是已有保证。连接 URL、认证方式、凭据或重要工具定义更新时也增加代次，旧绑定不静默切换目的地或账户。
+当前代码已在执行时通过 McpServerRepository.withAdmission 同锁检查权威状态，而不只信任 run 快照；连接 URL、认证方式、凭据、授权或重要工具定义变化推进持久 revision，旧绑定不静默切换目的地或账户。stateVersion 防陈旧完整配置覆盖，普通 TTL/cache 写入不推进安全代次。此实现尚未经 Android/竞态测试执行验证；已接纳副作用仍不能撤销。
 
 ### 5.3 确认策略
 
 - 内置工具的操作类型由受信任代码声明；不是由模型或服务端自报。
 - MCP `readOnlyHint` 只是提示；未知远端工具默认串行，启用时展示其外部执行属性。
-- 远端工具采用 D2 已确认的“按工具授权自动执行”：授权限定到 connectionId＋toolId，并绑定工具定义摘要与授权代次。符合授权目标和运行场景的调用不因属于写操作而逐次弹窗；未授权不执行，工具授权不等于整连接授权。
+- 远端工具采用 D2 已确认的“按工具授权自动执行”：当前为前台授权，授权限定到 connectionId＋toolId，enabledToolNames 与当前定义及 revision 共同约束执行。符合当前前台入口约束的调用不因属于写操作而逐次弹窗；未授权不执行，工具授权不等于整连接授权。后台 MCP 当前直接拒绝，尚无独立后台授权流程。
 - 自动执行仍需经过当前接纳检查；撤销立即阻止后续接纳，重要定义或账户变化需复核授权，目标含混仍需澄清，UNKNOWN 结果不盲目重试。前台授权不能隐含扩大为任意后台执行权限，后台入口仍须符合其策略。
 - 不把迁移所有既有工具与全面改变确认体验绑在同一补丁中；D2 不取消既有主屏审批，也不改写以下内置日历的独立里程碑。
 - 日历写入的逐次确认作为单独里程碑实现：展示操作、日历、时区、时间、提醒及待修改/删除对象。确认绑定 run、工具、规范化参数摘要、目标连接代次及有效期；参数变化需重确认。
@@ -184,7 +189,7 @@ MCP 目前是 run 快照权限，实施上述语义是新增行为，不是已�
 - 保留 AgentLazyToolGroups 的追加式加载策略；优先沿用既有分组，后续添加插件分组。
 - 不在第一版改写所有 Provider 的上下文策略。目录能追加的时机仍受现有 Provider 签名/历史约束控制。
 - MCP 保留现有发现预算、运行工具上限和结果大小限制；管理页必须显示有多少工具因预算未进入本轮，不承诺全部可用。
-- 刷新新增工具默认关闭；同名但 schema/权限语义变化的工具应标记待复核，不因名称相同而继承新的能力授权。以稳定字段的规范化摘要比较，描述变更也需展示差异。
+- 刷新新增工具默认关闭；同名但 schema/description/annotations 变化时，当前代码按规范化摘要撤销授权，不因名称相同继承新能力。历史定义保存与逐字段差异展示尚未实现；“展示定义差异”仍是后续目标。
 - 基础 v1 不做依赖自动安装。缺插件返回明确缺失状态。
 
 ## 7. 结果、事件与恢复
@@ -196,6 +201,8 @@ MCP 目前是 run 快照权限，实施上述语义是新增行为，不是已�
 第一阶段不重包旧 JSON 结果，避免破坏成功判定与展示逻辑。执行证据通过宿主事件/账本保存，原始秘密不进入日志。既有 sensitive 只限制参数/工具原始结果持久化，不保证模型最后正文不会复述其中内容；UI 和文档不能承诺自动全面脱敏。
 
 ### 7.2 操作状态（宿主账本，不等于模型输出）
+
+日历当前已接入下述状态机与独立 SQLite 账本；通用 MCP 调用日志使用较小的 ADMITTED / UNKNOWN / SUCCEEDED / FAILED / REJECTED 状态集，不等于所有插件均实现完整确认恢复。两种账本均先记录再执行，不以模型返回的任意字段认定可信状态。日历确认只消费宿主 prepare 与原本地执行结果；后台或无可用前台确认时不放行写入。
 
 ```text
 PREPARED → WAITING_APPROVAL → ADMITTED → IN_FLIGHT
@@ -225,7 +232,7 @@ Runtime 拥有 run session；插件路由不得重复 close 共享的 AgentLocal
 
 借鉴 Home Assistant 的实例管理，但不引入其实体平台或常驻客户端架构。连接持久配置与 run 内客户端分开；配置页面测试用临时客户端，结束后释放，不把一次测试成功等同于永久在线。
 
-状态拆为独立维度，避免一个 enabled 布尔值承担所有含义：
+以下状态矩阵及自动退避规则是后续目标，当前仅有启停/屏障/授权与失败反馈等有限投影，尚未实现完整健康分类或自动退避重连。状态应拆为独立维度，避免一个 enabled 布尔值承担所有含义：
 
 | 维度 | 建议状态 | 持久化原则 |
 |---|---|---|
@@ -247,24 +254,26 @@ Runtime 拥有 run session；插件路由不得重复 close 共享的 AgentLocal
 
 每个 MCP serverId 对应独立 connectionId、凭据引用、授权集合、代次和 run 内客户端。工作/个人两个实例即使 URL、工具原名相同，也生成不同模型名称，结果与历史均关联原 connectionId。
 
-工具描述带用户设置的连接别名；别名只用于展示，不用作权限身份。用户没有指定连接且存在多个可写候选时，先澄清或使用用户显式保存的默认选择，不由模型猜账户。读请求也不自动合并多个账户，除非任务明确要求。
+工具描述带用户设置的连接别名，别名不作为权限身份。当前已接入宿主本轮多连接选择 UI：首次远程调用若存在多个候选，由用户选择一个或多个连接，Runtime 通过 selectedConnections 延迟获取并按 run 缓存；没有前台承载时拒绝，不由模型猜账户。单连接沿用其已有显式工具授权。选择器代码尚未真机验收；选择多个连接也不等于授予未启用工具或允许模型自行扩大范围。连接选择只确定 connection/account，并不解析服务内部 workspace、文件夹、项目等目标；这些目标仍须通过服务参数明确，含混时需要用户确认，不能宣称宿主已强制解决所有目标歧义。
 
-Skill 可描述所需能力并让宿主解析为已配置连接；v1 不新增复杂依赖求解器。缺连接、未授权或定义变化都提示用户处理；Skill 不能写入授权表、携带可复用确认票据或自动切换到权限更大的连接。
+当前 Skill 仅说明显式连接选择与授权边界，不是依赖求解器，也不能自动匹配/安装连接或授予权限。宿主多连接选择独立于 Skill 文本，不把提示词当强制账户选择机制。缺连接、未授权或定义变化需用户处理；Skill 不能修改 enabledToolNames、携带可复用确认票据或自动切换到更大权限连接。
 
 ## 8. 存储与秘密管理
 
 不要复制 MCP 配置建立第二事实源：
 
 - MCP URL、协议、工具目录、启用集合仍在 mcp_servers；凭据仍由 McpSecretStore 保存。
-- PluginRepository 对外提供统一查询视图，内部组合内置插件状态和原 MCP Repository。
-- 内置新增 `plugin_states`：pluginId、enabled、settingsJson（非秘密）、revision、updatedAt。
-- 插件逐工具授权新增 `plugin_tool_grants`：connectionId、toolId、grantMode、approvedDefinitionDigest、revision。
-- 持久写入恢复里程碑才增加 `plugin_operations`；第一步不为尚不存在的恢复功能预建空框架。
-- MCP 连接增加 revision 或等价权威代次字段；各更新必须经过统一协调入口，避免 UI 旧方法绕过。
+- 当前管理投影直接消费原 MCP Repository 与既有内置开关；没有另外实现 PluginRepository 或复制 MCP 配置。
+- MCP 唯一启用授权集合沿用 `enabledToolNames`；不新增 `plugin_tool_grants` 或第二份授权表。定义摘要保存在工具定义中，schema/description/annotations 改变撤销该工具授权，新增工具默认关闭。
+- Room 29→30 为 `mcp_servers` 增加 revision、state_version、credential_update_pending，默认均为 0；各写入口经过统一协调，完整更新校验版本，专项授权校验被复核的 revision。
+- 未预建内置 `plugin_states`，内置日历沿用既有开关上限。
+- `PluginCallJournal` 使用独立 SQLite `calls` 表；`CalendarSqliteOperationLedger` 使用独立 SQLite `operations` 表，不把它们描述成 Room 的 `plugin_operations` 表。两者位于应用 noBackupFilesDir，限权威 App 进程的工作线程使用。
+- 调用接纳记录/日历 IN_FLIGHT 状态须先成功落盘，再执行远端或 Calendar Provider 副作用；账本写失败不放行。日历参数摘要与最小事件 ID 证据经 Android Keystore 绑定的 AES-GCM 编码，不把原始参数复制为通用调用日志。
+- 账本按共享 process owner 恢复：仅旧 owner 未完成调用转 UNKNOWN；日历旧 owner 的 IN_FLIGHT 转 UNKNOWN，尚未开始的准备/确认/接纳转 CANCELLED_NOT_STARTED。同进程新 run 打开账本不能误伤仍活跃操作，恢复不会自动重放。
 
 数据库迁移显式版本化，旧工具组开关作为上限保留。首次迁移让已存在的内置插件继承旧可用性，不擅自打开原来关闭的能力；新增远程工具默认不授权。
 
-MCP 配置和密钥存储不具备跨存储原子性，更新中应保持连接不可接纳，成功后发布新代次；失败恢复或明确停用，不能继续用未知账户状态。Hook/入口 IPC 只传调用请求和非秘密身份，凭据不进入 RemotePreferences、模型参数、导出日志。
+MCP 配置和密钥存储不具备跨存储原子性。当前先在 Room 持久化清空授权、推进 revision 与 credential_update_pending 屏障，再更换秘密，完成后清除屏障；失败或进程死亡不能让新 token 继承旧授权，需显式重新保存凭据或删除恢复。写失败还保留本进程拒绝态并向 UI 发射。Hook/入口 IPC 不新增凭据传输，凭据不进入模型参数或通用调用日志。
 
 权威状态留在 App Runtime 所属进程。若未来真的拆成多应用进程，必须新增有 UID 校验的 Binder 配置/接纳服务；不能把当前 Room Flow 或 SharedPreferences 当作跨进程即时撤销保证。
 
@@ -345,7 +354,20 @@ pluginId：`builtin.calendar`。
 
 ## 12. 实施切片及文件范围
 
-阶段编号在 v0.2 重新定义，不能继续按旧版 P0/P1 的日历优先顺序执行。
+阶段编号沿用 v0.2 的外部接入优先顺序。以下阶段正文保留目标与退出条件，不意味着全部验收完成。
+
+### 本轮实现与验证状态（优先于后文历史规划措辞）
+
+| 阶段 | 本地代码已接入 | 尚未完成/未验证 |
+|---|---|---|
+| P0 | 身份、descriptor、registry、冻结绑定、保留名与冲突处理；相关定向测试已通过 | 非定制服务基线未实测 |
+| P1 | Runtime 插件路由、MCP 目录/执行适配、双连接身份与凭据隔离、子代理路由；编译与相关定向测试已通过 | 双账户真实服务与设备运行未验证 |
+| P2 | enabledToolNames 权威授权、定义摘要撤销、持久 revision、陈旧写拒绝、凭据屏障、执行接纳、失效客户端尽力关闭、扩展管理与调用历史 | 自动退避重连、完整健康状态分类、历史定义 diff 未实现；后台 MCP 独立授权未实现，当前明确拒绝 |
+| P3 | Skill 连接用法说明；Runtime 首次远程调用多候选时由宿主前台选择一个或多个连接，结果按 run 缓存；无前台拒绝多连接选择，单连接沿用已授工具授权 | Skill 无依赖求解器/自动授权；宿主选择器与组合流程未真机验收；至少一个非定制服务验收尚未做 |
+| P4 | 七项内置日历描述适配、注册路由，仍委托原 LocalTools 保留权限/取消/租约 | Calendar facade 尚未完全抽离中央实现；真机 Root/普通权限双路径未验收 |
+| P5 | 宿主只读 prepare、固定日历/时区/时间、前台逐次确认、目标摘要复核、先落盘后副作用、加密证据、owner 恢复；创建先保留 Provider IDs 再回读，回读异常 UNKNOWN；编译、相关定向测试与 Lint 已通过 | 进程中止、真实 Keystore、确认 UI、真机日历闭环未验收；Provider 检查与写入仍有外部并发窗口，无跨存储 exactly-once |
+
+本轮已完成本地编译、158 项定向测试（零失败，1 跳过）及 Lint（零错误）。完整单元测试仍有 54 项失败，均在未改造基线复现；详见 [本地验证记录](PLUGIN_VALIDATION.md)。真实非定制服务、APK 打包与真机验收均未完成，不因表中“接入”字样宣称阶段退出或产品已发布。
 
 ### P0：外部接入基线与最小契约
 
@@ -417,9 +439,9 @@ pluginId：`builtin.calendar`。
 
 验收按阶段归属执行：P0–P3 不要求日历迁移或新写操作账本，但必须保留已有写失败/取消的真实语义、禁止新增盲目重放；日历确认、写后崩溃恢复和日历新路由验收分别随 P4/P5 完成。
 
-测试分层：纯 JVM 注册/策略/映射；Robolectric 数据迁移和 Android 边界；可控 MCP 服务的双账户与故障注入集成测试；非 ETA 定制 MCP 服务兼容性实测；后续真机日历、权限撤销、Root/非 Root、后台与进程中止。实现时增补测试；本轮没有执行这些测试。
+测试分层：纯 JVM 注册/策略/映射；Robolectric 数据迁移和 Android 边界；可控 MCP 服务的双账户与故障注入集成测试；非 ETA 定制 MCP 服务兼容性实测；后续真机日历、权限撤销、Root/非 Root、后台与进程中止。已执行本地 JVM/Robolectric 测试与夹具测试；各层结果及尚未执行的真机/真实服务验收见 [本地验证记录](PLUGIN_VALIDATION.md)。
 
-按仓库约定不在本地运行 Gradle，构建、单测、Lint、APK 验收需用户另行授权对应发布流程。本次按用户要求提交设计文档到本地独立分支，不推送、不触发 Actions；文档提交不代表方案全部获批或验收已经执行。
+经用户明确批准，已运行本地 Gradle：主代码与测试编译通过，158 项定向测试零失败（1 跳过），Lint 零错误。全套 2327 项有 54 失败、3 跳过；54 项失败均在基线复现，不称全套通过。未打包 APK 或真机验收；仅本地修改，未提交、推送、切分支或触发 Actions。具体结果见 [本地验证记录](PLUGIN_VALIDATION.md)。
 
 ## 14. 评审建议结论
 
@@ -458,7 +480,7 @@ pluginId：`builtin.calendar`。
 
 ## 16. 产品决策记录与待确认事项
 
-D1、D2 已于 2026-11-05 由用户明确选择“个人技术用户”和“按工具授权自动执行”；D3、D4 仍为建议，尚未获批。上述选择不代表商业用途选择，也不构成业务实现、推送或发布授权。技术合同中的一致性问题由工程侧收口，不要求产品负责人决定类名、数据库表名或锁实现。
+D1、D2 已于 2026-11-05 由用户明确选择“个人技术用户”和“按工具授权自动执行”，之后另行授权持续本地实现；D3、D4 仍为建议，尚未获批。本地实现授权不包含商业用途选择、提交推送或发布。技术合同中的一致性由工程侧收口，不要求产品负责人决定类名、数据库表名或锁实现。
 
 | 决策 | 推荐方案 | 另一方向及代价 | 何时需要决定 |
 |---|---|---|---|
@@ -467,6 +489,6 @@ D1、D2 已于 2026-11-05 由用户明确选择“个人技术用户”和“按
 | D3 首个真实场景 | 笔记/文档服务：检索资料→整理→创建草稿，验证两个账户与 Skill 组合，不直接发送或公开发布 | 智能家居更直观，但依赖设备/网关；邮箱/日历更贴近日常，但认证和误发送/重复写入成本更高 | P0 固定测试场景，P3 前选定兼容的真实服务；当前未选服务、未承诺支持其 OAuth |
 | D4 项目用途与许可路线 | 先保持个人/非商业研究定位，不按商业产品承诺发布 | 若计划商业化，需先评估当前上游许可、取得适用商业授权或另定可行技术/许可路线；更名、换包名和暂不收费都不自动消除限制 | 商业化开发或发行决策前 |
 
-D1、D2 已确认，D2 已纳入 P2/P3 设计范围，但尚未实现。D3 首个真实场景与 D4 用途/许可路线仍待确认；D3 的真实服务选择要以兼容性核对为依据，不凭项目名称猜可用性。D4 依据仓库 [LICENSE](../LICENSE) 的 PolyForm Noncommercial 1.0.0 条款，需结合具体用途评估，不是本文件提供法律结论。
+D1、D2 已确认，D2 的前台逐工具授权与实时接纳代码已接入，尚未通过运行验收；后台独立授权未实现，后台 MCP 仍拒绝。D3 首个真实非定制服务场景与 D4 用途/许可路线仍待确认；服务选择须以兼容性核对为依据。D4 依据仓库 [LICENSE](../LICENSE) 的 PolyForm Noncommercial 1.0.0 条款，需结合具体用途评估，本文件不提供法律结论。
 
-本次交付仅为待评审设计文档的本地提交；业务代码、数据库、模型配置与发布流程均未更改。
+本次同步记录本地业务代码、数据库迁移及测试用例的实现状态；未提交发布，未更改模型配置，不宣称全部改造或退出条件已验收。

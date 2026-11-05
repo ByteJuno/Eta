@@ -87,11 +87,9 @@ internal class McpHttpClient(
                 ).json,
             ) { "MCP 工具返回为空" },
         )
-        return if (version in SUPPORTED_LEGACY_PROTOCOL_VERSIONS) {
-            withLegacySessionRetry(::invoke)
-        } else {
-            invoke(sessionId = null)
-        }
+        // A lost/expired session response does not prove a write had no effect.
+        // Reinitialize on a new run rather than replaying tools/call automatically.
+        return invoke(if (version in SUPPORTED_LEGACY_PROTOCOL_VERSIONS) legacySessionId else null)
     }
 
     override fun close() {
@@ -261,6 +259,12 @@ internal class McpHttpClient(
             destructiveHint = annotations?.nullableBoolean("destructiveHint"),
             idempotentHint = annotations?.nullableBoolean("idempotentHint"),
             openWorldHint = annotations?.nullableBoolean("openWorldHint"),
+            authorizationDefinitionDigest = io.github.bytejuno.theta.data.model.mcpToolDefinitionDigest(
+                schemaJson = (schema ?: JSONObject()).toString(),
+                description = source.optString("description"),
+                annotationsJson = annotations?.toString() ?: "{}",
+                title = source.optString("title"),
+            ),
         )
     }
 

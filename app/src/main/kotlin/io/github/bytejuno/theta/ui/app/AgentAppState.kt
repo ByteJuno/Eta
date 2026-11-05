@@ -147,6 +147,12 @@ internal class AgentAppState(
     )
         private set
 
+    /** UI-thread-only projection of the selected conversation's authoritative run slot. */
+    val calendarApprovalRunId: String?
+        get() = if (homeState.isStreaming && !isLoadingConversation) {
+            activeRuns.runIdForConversation(selectedConversationId)
+        } else null
+
     var modelPickerState by mutableStateOf(AgentModelPickerUiState())
         private set
 

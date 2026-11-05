@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="calendar_approval_title">确认日历变更</string>
+    <string name="calendar_approval_scope">仅批准本次具体操作。请检查下方日历/事件目标、时间、时区、提醒与修改字段。离开此会话或前台会撤销待批准请求。取消不能撤销已经开始的操作。</string>
+    <string name="calendar_approval_tool">操作：%1$s</string>
+    <string name="calendar_approval_identity">连接：%1$s\n操作 ID：%2$s</string>
+    <string name="calendar_approval_target">现有目标（变更前）</string>
+    <string name="calendar_approval_fields">将执行的完整字段（日历 calendar_id / 事件 event_id、起止时间 start_time / end_time、时区 timezone、提醒分钟 reminder_minutes 等；批量事件逐项列出）</string>
+    <string name="calendar_approval_expiry">批准有效期至：%1$s</string>
+    <string name="calendar_approval_confirm">批准本次操作</string>
+    <string name="calendar_approval_deny">不执行</string>
+</resources>

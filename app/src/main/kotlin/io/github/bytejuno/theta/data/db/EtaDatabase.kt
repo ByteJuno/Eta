@@ -29,7 +29,7 @@ import androidx.room.migration.Migration
         AgentTaskRunEntity::class,
         LearningProposalEntity::class,
     ],
-    version = 29,
+    version = 30,
     exportSchema = false,
 )
 internal abstract class EtaDatabase : RoomDatabase() {
@@ -77,6 +77,7 @@ internal abstract class EtaDatabase : RoomDatabase() {
                         MIGRATION_26_27,
                         MIGRATION_27_28,
                         MIGRATION_28_29,
+                        MIGRATION_29_30,
                     )
                     .addCallback(object : Callback() {
                         override fun onCreate(db: androidx.sqlite.db.SupportSQLiteDatabase) { createTextChunkCleanup(db) }
@@ -197,6 +198,12 @@ internal abstract class EtaDatabase : RoomDatabase() {
             if (!hasAuthMode) {
                 database.execSQL("ALTER TABLE model_providers ADD COLUMN auth_mode TEXT NOT NULL DEFAULT 'api_key'")
             }
+        }
+
+        internal val MIGRATION_29_30 = Migration(29, 30) { database ->
+            database.execSQL("ALTER TABLE mcp_servers ADD COLUMN revision INTEGER NOT NULL DEFAULT 0")
+            database.execSQL("ALTER TABLE mcp_servers ADD COLUMN state_version INTEGER NOT NULL DEFAULT 0")
+            database.execSQL("ALTER TABLE mcp_servers ADD COLUMN credential_update_pending INTEGER NOT NULL DEFAULT 0")
         }
 
         internal val MIGRATION_28_29 = Migration(28, 29) { database ->

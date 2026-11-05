@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="mcp_target_title">选择本轮使用的账户</string>
+    <string name="mcp_target_scope">请为本轮任务明确选择一个或多个远程连接。默认不选中任何账户；名称相同不代表同一账户。此选择不授予工具权限，也不扩大入口权限。离开此会话或前台会取消待确认选择。</string>
+    <string name="mcp_target_connection_id">连接 ID：%1$s</string>
+    <string name="mcp_target_confirm">使用选中账户</string>
+    <string name="mcp_target_deny">不继续</string>
+</resources>

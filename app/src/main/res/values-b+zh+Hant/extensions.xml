@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="route_extensions">擴充功能</string>
+    <string name="extensions_summary">內建能力、已連接服務與技能</string>
+    <string name="extensions_builtin">內建能力</string>
+    <string name="extensions_builtin_summary">查看手機工具及其所需的系統權限。</string>
+    <string name="extensions_services">已連接服務</string>
+    <string name="extensions_services_summary">新增遠端 MCP 連線，探索工具並逐項授權。</string>
+    <string name="extensions_skills">技能</string>
+    <string name="extensions_skills_summary">管理指導內容與資源。技能不能授予工具權限或啟用連線。</string>
+    <string name="extensions_scope">三類擴充功能保留各自的設定。遠端工具在所連接的服務端執行；技能說明如何使用工具，不是程式碼沙箱。</string>
+    <string name="mcp_authorization_policy">授權僅針對本連線內的單項工具。已授權工具在任務與入口約束內自動執行，寫入操作不逐次彈窗；未授權不執行。新增工具需授權。定義變化導致授權撤銷後，需查看新定義並重新授權。停用只關閉直接工具入口，不回復已有副作用，也不阻斷其他通用工具的存取。已開始的遠端操作仍可能完成。</string>
+    <string name="mcp_remote_data_notice">任務參數會傳送到此遠端服務。不同帳戶連線請使用不同名稱。連線成功、探索工具不等於工具已授權。</string>
+    <string name="mcp_connection_status">MCP · %1$s</string>
+    <string name="mcp_connection_enabled">已啟用（非即時線上狀態）</string>
+    <string name="mcp_connection_disabled">已停用</string>
+    <string name="mcp_connection_needs_grant">尚無已授權工具</string>
+    <string name="mcp_credentials_pending">憑證更新未完成，呼叫已阻止；請重新儲存身分驗證。</string>
+    <string name="mcp_granted_count">已授權 %1$d / 快取工具 %2$d</string>
+    <string name="mcp_last_checked">最後成功檢查工具：%1$s（快取，非即時線上）</string>
+    <string name="mcp_never_checked">尚無成功檢查工具的記錄，目前連線狀態未知</string>
+    <string name="mcp_change_failed">未能儲存此變更。連線可能已變化，請重新整理並檢查目前設定後重試。</string>
+    <string name="mcp_grant_stale">彈窗開啟期間連線已變化。請關閉彈窗，查看最新工具定義後重新授權。</string>
+    <string name="mcp_tool_schema">服務提供的輸入參數定義：\n%1$s</string>
+</resources>

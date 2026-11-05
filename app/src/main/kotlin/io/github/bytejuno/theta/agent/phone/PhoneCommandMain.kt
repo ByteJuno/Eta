@@ -22,7 +22,7 @@ internal object PhoneCommandMain {
                 if (request.optInt("version") != 1)
                     PhoneOperation.error("PHONE_PROTOCOL_UNSUPPORTED", "请求协议不兼容")
                 val tool = PhoneOperation.text(request, "tool", true, 80)!!
-                if (tool !in PhoneOperation.tools && tool != "capabilities")
+                if (tool !in PhoneOperation.tools && tool != "capabilities" && tool != "prepare_calendar_write")
                     PhoneOperation.error("UNKNOWN_TOOL", "未知一方应用操作")
                 val userId = PhoneOperation.integer(request, "user_id", 0, 21474).toInt()
                 if (Looper.getMainLooper() == null) Looper.prepareMainLooper()

@@ -20,7 +20,6 @@ import io.github.bytejuno.theta.agent.subagent.AgentSubagentToolCatalog
 import io.github.bytejuno.theta.agent.subagent.SubagentExecutor
 import io.github.bytejuno.theta.agent.mcp.McpRunSnapshot
 import io.github.bytejuno.theta.agent.mcp.McpToolExecutor
-import io.github.bytejuno.theta.agent.mcp.RoutingToolExecutor
 import io.github.bytejuno.theta.agent.overlay.AgentOverlayVisibilityPolicy
 import io.github.bytejuno.theta.agent.skill.SkillCompatibilityChecker
 import io.github.bytejuno.theta.agent.skill.SkillContext
@@ -81,6 +80,13 @@ internal class AgentRuntimeRunExecutor(
         var toolExecutor: AutoCloseable? = null
         var localTools: AgentLocalTools? = null
         var toolsBinding: AgentRunController.ResourceBinding? = null
+        val childResources = java.util.concurrent.CopyOnWriteArrayList<AutoCloseable>()
+        val pluginJournal = lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
+            io.github.bytejuno.theta.agent.plugin.PluginCallJournal(appContext)
+        }
+        val calendarLedger = lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
+            io.github.bytejuno.theta.agent.plugin.calendar.CalendarSqliteOperationLedger(appContext)
+        }
         var response: AgentModelClient.ModelResponse.Text? = null
         var cancelled = false
         var roleplayRun = false
@@ -162,14 +168,39 @@ internal class AgentRuntimeRunExecutor(
             }
             val pendingSkillConflict = PendingSkillConflictCapabilityParser.parse(request.history)
             val mcpSnapshot = runBlocking {
-                runCatching { McpRunSnapshot.load() }.getOrElse { throwable ->
+                runCatching {
+                    McpRunSnapshot.load(
+                        registerCancellation = { cancel ->
+                            val binding = runController.register(cancel)
+                            AutoCloseable { binding.close() }
+                        },
+                        checkCancelled = runController::throwIfCancelled,
+                    )
+                }.getOrElse { throwable ->
                     AndroidAgentLogger.warnThrottled("agent_mcp_snapshot_failed") {
                         "MCP tool snapshot unavailable: type=${throwable.safeLogType()}"
                     }
                     McpRunSnapshot.EMPTY
                 }
             }
-            val mcpTools = JSONArray().also(mcpSnapshot::appendModelTools)
+            runController.throwIfCancelled()
+            // Bind all calendar identities before dynamic capability projection. This is not
+            // authorization: the model catalog and LocalTools retain current permission checks.
+            val localCatalog = io.github.bytejuno.theta.agent.model.AgentToolCatalog.build(
+                terminalTools = false,
+                browserTools = false,
+                deviceDirectTools = true,
+                deviceSensitiveReadTools = true,
+                deviceSensitiveActionTools = true,
+                capabilities = AgentToolCapabilities(rootAvailable = true, lsposedAvailable = true),
+            )
+            val pluginBindings = io.github.bytejuno.theta.agent.plugin.McpPluginCatalog.buildRunBindings(
+                mcpSnapshot,
+                occupiedModelNames = CharacterMemoryTools.NAMES,
+                builtinDescriptors = io.github.bytejuno.theta.agent.plugin.BuiltinCalendarAdapter.descriptors(localCatalog),
+            )
+            // Calendar schemas remain in the existing local catalog; do not publish duplicates.
+            val mcpTools = pluginBindings.modelTools(io.github.bytejuno.theta.agent.plugin.McpPluginCatalog.PLUGIN_ID)
             val executor = AgentLocalTools(
                 context = appContext,
                 logger = AndroidAgentLogger,
@@ -254,9 +285,92 @@ internal class AgentRuntimeRunExecutor(
                 onMainScreenFallback = { session.mainScreenFallbackApproved.set(true) },
                 virtualDisplayEnabled = { currentPermissions().virtualDisplay },
             )
-            val routingExecutor = RoutingToolExecutor(
-                local = executor,
-                mcp = McpToolExecutor(mcpSnapshot),
+            localTools = executor
+            toolExecutor = executor
+            fun calendarExecutor(
+                controller: AgentRunController,
+                childId: String? = null,
+                parentCallId: String? = null,
+            ): AgentModelClient.ToolExecutor = AgentModelClient.ToolExecutor { call ->
+                if (call.name !in io.github.bytejuno.theta.agent.plugin.calendar.CalendarWriteCoordinator.WRITE_TOOLS) {
+                    executor.execute(call)
+                } else {
+                    val bridge = io.github.bytejuno.theta.agent.plugin.calendar.CalendarApprovalBridge
+                    val ledger = calendarLedger.value
+                    val coordinator = io.github.bytejuno.theta.agent.plugin.calendar.CalendarWriteCoordinator(
+                        ledger = ledger,
+                        processOwner = ledger.processOwner,
+                        isMainThread = { android.os.Looper.myLooper() == android.os.Looper.getMainLooper() },
+                        approval = bridge,
+                    )
+                    val initiallyVisible = bridge.canPresent(request.runId)
+                    io.github.bytejuno.theta.agent.plugin.calendar.CalendarRuntimeAdapter(executor::prepareCalendarWriteForApproval).wrap(
+                        delegate = executor,
+                        coordinator = coordinator,
+                        context = {
+                            io.github.bytejuno.theta.agent.plugin.calendar.CalendarWriteContext(
+                                runId = request.runId,
+                                connectionId = io.github.bytejuno.theta.agent.plugin.BuiltinCalendarAdapter.CONNECTION_ID,
+                                generation = 0,
+                                parentCallId = parentCallId,
+                                childId = childId,
+                                canRequestApproval = initiallyVisible,
+                                isCancelled = {
+                                    runController.isCancelled || controller.isCancelled ||
+                                        runController.hasPendingSteering || controller.hasPendingSteering
+                                },
+                                isPaused = { runController.isPaused || controller.isPaused },
+                                stillAllowed = {
+                                    request.config.deviceSensitiveActionTools &&
+                                        currentPermissions().deviceSensitiveActionTools &&
+                                        (!initiallyVisible || bridge.canPresent(request.runId))
+                                },
+                            )
+                        },
+                    ).execute(call)
+                }
+            }
+            val connectionLocks = mcpSnapshot.tools.associate {
+                it.server.id to java.util.concurrent.locks.ReentrantLock()
+            }
+            val runConnections = mcpSnapshot.tools.map { it.server.id to it.server.name }.distinctBy { it.first }
+            val selectedConnections = lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
+                if (runConnections.size <= 1) runConnections.map { it.first }.toSet()
+                else io.github.bytejuno.theta.agent.plugin.McpTargetSelectionBridge.select(
+                    request.runId, runConnections, { runController.isCancelled || runController.hasPendingSteering },
+                )
+            }
+            fun selectedRemote(remote: AgentModelClient.ToolExecutor): AgentModelClient.ToolExecutor =
+                AgentModelClient.ToolExecutor { call ->
+                    val connection = pluginBindings.resolve(call.name)?.identity?.connectionId
+                    if (connection !in selectedConnections.value) {
+                        AgentModelClient.ToolResult(JSONObject().put("ok", false)
+                            .put("code", "PLUGIN_TARGET_SELECTION_REQUIRED")
+                            .put("message", "本轮尚未由用户选择此连接，未执行远程调用").toString(), sensitive = true)
+                    } else remote.execute(call)
+                }
+            val remoteExecutor = McpToolExecutor(
+                mcpSnapshot,
+                connectionLocks = connectionLocks,
+                runId = request.runId,
+                journalProvider = { pluginJournal.value },
+                isCancelled = { runController.isCancelled },
+                isExecutionAllowed = {
+                    !runController.isPaused &&
+                        !io.github.bytejuno.theta.agent.automation.AgentTaskScheduler.isRegistered(request.runId)
+                },
+            )
+            val routingExecutor = io.github.bytejuno.theta.agent.plugin.PluginRoutingExecutor(
+                bindings = pluginBindings,
+                local = calendarExecutor(runController),
+                remote = selectedRemote(remoteExecutor),
+                closeResources = {
+                    try {
+                        remoteExecutor.close()
+                    } finally {
+                        executor.close()
+                    }
+                },
             )
             localTools = executor
             toolExecutor = routingExecutor
@@ -287,6 +401,39 @@ internal class AgentRuntimeRunExecutor(
                 skillContext = skillContext,
                 memoryContext = memoryContext,
                 mcpTools = mcpTools,
+                toolBindingFingerprint = java.security.MessageDigest.getInstance("SHA-256").digest(
+                    JSONArray().also { values ->
+                        mcpSnapshot.tools.sortedBy { it.modelName }.forEach { tool ->
+                            values.put(JSONArray().put(tool.server.id).put(tool.server.revision)
+                                .put(tool.definition.name).put(tool.modelName))
+                        }
+                    }.toString().toByteArray(Charsets.UTF_8),
+                ).joinToString("") { "%02x".format(it.toInt() and 255) },
+                executorForChild = { child, childId, parentCallId ->
+                    val childRemote = McpToolExecutor(
+                        mcpSnapshot,
+                        connectionLocks = connectionLocks,
+                        runId = request.runId + ":" + childId,
+                        journalProvider = { pluginJournal.value },
+                        isCancelled = { runController.isCancelled || child.isCancelled },
+                        isExecutionAllowed = {
+                            !runController.isPaused && !child.isPaused &&
+                                !io.github.bytejuno.theta.agent.automation.AgentTaskScheduler.isRegistered(request.runId)
+                        },
+                    )
+                    childResources.add(childRemote)
+                    val childBinding = child.register(childRemote::close)
+                    childResources.add(AutoCloseable { childBinding.close() })
+                    val childLocal = calendarExecutor(child, childId, parentCallId)
+                    val childRouting = io.github.bytejuno.theta.agent.plugin.PluginRoutingExecutor(
+                        pluginBindings, childLocal, selectedRemote(childRemote), childRemote::close,
+                    )
+                    AgentModelClient.ToolExecutor { call ->
+                        child.throwIfCancelled()
+                        runController.throwIfCancelled()
+                        childRouting.execute(call)
+                    }
+                },
                 executionContext = executor.terminalExecutionContext,
                 onProgress = { progressEvent ->
                     acceptEvent(
@@ -437,7 +584,10 @@ internal class AgentRuntimeRunExecutor(
             )
         } finally {
             runCatching { toolsBinding?.close() }
+            childResources.reversed().forEach { runCatching { it.close() } }
             runCatching { toolExecutor?.close() }
+            if (calendarLedger.isInitialized()) runCatching { calendarLedger.value.close() }
+            if (pluginJournal.isInitialized()) runCatching { pluginJournal.value.close() }
         }
 
         if (cancelled && session.isTerminal) {

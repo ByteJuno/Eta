@@ -362,24 +362,15 @@ private fun SettingsPageContent(
                         onClick = { onNavigate(AppRoute.Subagents) },
                     )
                     ArrowPreference(
-                        title = stringResource(R.string.route_skills),
-                        startAction = {
-                            SettingsIcon(
-                                icon = Icons.Rounded.ImportContacts,
-                                tint = SettingsIconColors.Green,
-                            )
-                        },
-                        onClick = { onNavigate(AppRoute.Skills) },
-                    )
-                    ArrowPreference(
-                        title = stringResource(R.string.route_mcp_servers),
+                        title = stringResource(R.string.route_extensions),
+                        summary = stringResource(R.string.extensions_summary),
                         startAction = {
                             SettingsIcon(
                                 icon = Icons.Rounded.AccountTree,
                                 tint = SettingsIconColors.Blue,
                             )
                         },
-                        onClick = { onNavigate(AppRoute.McpServers) },
+                        onClick = { onNavigate(AppRoute.Extensions) },
                     )
                     ArrowPreference(
                         title = "角色",

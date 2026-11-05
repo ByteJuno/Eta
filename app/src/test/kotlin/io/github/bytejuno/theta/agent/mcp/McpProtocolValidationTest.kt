@@ -250,7 +250,7 @@ data: "id":1,"result":{"resultType":"complete","ttlMs":1000,"tools":[]}}
     }
 
     @Test
-    fun legacyToolCallReinitializesOnceAfterSession404() {
+    fun legacyToolCallDoesNotReplayAfterSession404() {
         val initializeCount = AtomicInteger()
         val toolCallCount = AtomicInteger()
         val server = localServer { exchange ->
@@ -291,12 +291,12 @@ data: "id":1,"result":{"resultType":"complete","ttlMs":1000,"tools":[]}}
             val configured = McpServerSetting(id = "test", name = "Test", url = server.url())
             McpHttpClient(configured, bearerToken = null).use { client ->
                 val tool = client.discoverTools().tools.single()
-                val result = client.callTool(tool, JSONObject())
-
-                assertEquals("ok", result.getJSONArray("content").getJSONObject(0).getString("text"))
+                org.junit.Assert.assertThrows(McpHttpStatusException::class.java) {
+                    client.callTool(tool, JSONObject())
+                }
             }
-            assertEquals(2, initializeCount.get())
-            assertEquals(2, toolCallCount.get())
+            assertEquals(1, initializeCount.get())
+            assertEquals(1, toolCallCount.get())
         } finally {
             server.stop(0)
         }

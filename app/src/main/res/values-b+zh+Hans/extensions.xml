@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="route_extensions">扩展</string>
+    <string name="extensions_summary">内置能力、已连接服务和技能</string>
+    <string name="extensions_builtin">内置能力</string>
+    <string name="extensions_builtin_summary">查看手机工具及其所需的系统权限。</string>
+    <string name="extensions_services">已连接服务</string>
+    <string name="extensions_services_summary">添加远程 MCP 连接，发现工具并逐项授权。</string>
+    <string name="extensions_skills">技能</string>
+    <string name="extensions_skills_summary">管理指导内容与资源。技能不能授予工具权限或启用连接。</string>
+    <string name="extensions_scope">三类扩展保留各自的设置。远程工具在所连接的服务端执行；技能说明如何使用工具，不是代码沙箱。</string>
+    <string name="mcp_authorization_policy">授权仅针对本连接内的单项工具。已授权工具在任务与入口约束内自动执行，写操作不逐次弹窗；未授权不执行。新增工具需授权。定义变化导致授权撤销后，需查看新定义并重新授权。停用只关闭直接工具入口，不回滚已有副作用，也不阻断其他通用工具的访问。已开始的远端操作仍可能完成。</string>
+    <string name="mcp_remote_data_notice">任务参数会发送到此远程服务。不同账户连接请使用不同名称。连接成功、发现工具不等于工具已授权。</string>
+    <string name="mcp_connection_status">MCP · %1$s</string>
+    <string name="mcp_connection_enabled">已启用（非实时在线状态）</string>
+    <string name="mcp_connection_disabled">已停用</string>
+    <string name="mcp_connection_needs_grant">尚无已授权工具</string>
+    <string name="mcp_credentials_pending">凭据更新未完成，调用已阻止；请重新保存身份认证。</string>
+    <string name="mcp_granted_count">已授权 %1$d / 缓存工具 %2$d</string>
+    <string name="mcp_last_checked">最后成功检查工具：%1$s（缓存，非实时在线）</string>
+    <string name="mcp_never_checked">尚无成功检查工具的记录，当前连接状态未知</string>
+    <string name="mcp_change_failed">未能保存此变更。连接可能已变化，请刷新并检查当前设置后重试。</string>
+    <string name="mcp_grant_stale">弹窗打开期间连接已变化。请关闭弹窗，查看最新工具定义后重新授权。</string>
+    <string name="mcp_tool_schema">服务提供的输入参数定义：\n%1$s</string>
+</resources>

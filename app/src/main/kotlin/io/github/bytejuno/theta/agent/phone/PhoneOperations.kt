@@ -31,6 +31,7 @@ internal object PhoneOperations {
                     "set_sound_mode" ->
                         NativeSystemOperations(context, userId ?: 0, markMutation)
                             .execute(tool, args)
+                    "prepare_calendar_write", // Host-only; deliberately absent from PhoneOperation.tools.
                     "list_calendars",
                     "read_calendar_event",
                     "search_calendar_events",
@@ -72,6 +73,8 @@ internal object PhoneOperations {
                         .put("status", "unconfirmed")
                         .put("verified", false)
                         .put("message", "操作可能已执行，但未能确认完整结果；请先查询状态，不要重复创建")
+                else if (!result.optBoolean("ok") && tool in PhoneOperation.writes)
+                    result.put("status", "rejected").put("verified", false)
             }
     }
 }

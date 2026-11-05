@@ -2,10 +2,23 @@ package io.github.bytejuno.theta.data.db
 
 import io.github.bytejuno.theta.data.model.McpAuthorizationType
 import io.github.bytejuno.theta.data.model.McpProtocolMode
+import io.github.bytejuno.theta.data.model.McpServerSetting
+import io.github.bytejuno.theta.data.model.McpToolDefinition
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class McpEntitiesTest {
+    @Test
+    fun authorityVersionsBarrierAndWireDigestRoundTrip() {
+        val server = McpServerSetting(
+            "server", "Server", "https://example.com/mcp",
+            tools = listOf(McpToolDefinition("write", inputSchemaJson = "{}", authorizationDefinitionDigest = "digest")),
+            enabledToolNames = setOf("write"), revision = 7, stateVersion = 11, credentialUpdatePending = true,
+        )
+        assertEquals(server, server.toEntity().toDomain())
+        assertEquals(emptyList<McpToolDefinition>(), server.toEntity().toDomain().activeTools)
+    }
+
     @Test
     fun legacyUnavailableReasonIsIgnoredWhenLoadingCachedTools() {
         val entity = McpServerEntity(

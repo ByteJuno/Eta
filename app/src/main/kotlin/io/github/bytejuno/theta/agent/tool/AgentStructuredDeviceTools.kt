@@ -58,6 +58,9 @@ internal class AgentStructuredDeviceTools(
 
     /** 只走一方应用接口；返回 null 表示本机只能用系统界面。 */
     fun nativePhoneTool(tool: String, args: JSONObject): JSONObject? = phoneApps.execute(tool, args)
+
+    fun prepareCalendarWrite(tool: String, args: JSONObject): JSONObject =
+        phoneApps.prepareCalendarWrite(tool, args)
     private val displaySound =
         DisplaySoundControls(context) { root.execute(it, maxOutputBytes = 32 * 1024) }
     private val systemStates =

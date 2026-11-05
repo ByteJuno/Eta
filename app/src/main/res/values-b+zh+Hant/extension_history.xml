@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="calendar_unknown_title">待核查的日曆操作</string>
+    <string name="calendar_unknown_summary">查看 UNKNOWN 記錄，不重放操作。</string>
+    <string name="calendar_unknown_notice">最多顯示 100 條 UNKNOWN 記錄，較早記錄優先。副作用可能已經發生，請先核查日曆；本頁不會重試、確認成功或回復變更。</string>
+    <string name="calendar_unknown_empty">本機帳本未發現 UNKNOWN 記錄，不代表所有日曆變更都已成功。</string>
+    <string name="calendar_unknown_record">UNKNOWN（結果不確定）\n操作：%1$s\n任務：%2$s\n工具：%3$s\n連線：%4$s</string>
+    <string name="extension_history_loading">正在讀取本機記錄…</string>
+    <string name="extension_history_failed">無法讀取本機記錄，未重試任何操作。</string>
+    <string name="plugin_calls_title">最近擴充功能呼叫</string>
+    <string name="plugin_calls_summary">本機中繼資料：連線、工具、狀態與耗時。</string>
+    <string name="plugin_calls_notice">最多顯示最近 100 條呼叫，新記錄優先。ADMITTED 表示進行中；UNKNOWN 需核查，不應自動重放。狀態是宿主證據，不保證遠端回復。查看記錄不會發起網路請求。</string>
+    <string name="plugin_calls_empty">暫無本機呼叫記錄。</string>
+    <string name="plugin_calls_record">狀態：%1$s\n連線：%2$s\n工具：%3$s\n任務：%4$s\n呼叫：%5$s\n代次：%6$s\n開始：%7$s\n耗時：%8$s 毫秒</string>
+</resources>

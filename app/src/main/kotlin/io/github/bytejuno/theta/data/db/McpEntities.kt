@@ -25,6 +25,9 @@ internal data class McpServerEntity(
     @ColumnInfo(name = "last_refreshed_at") val lastRefreshedAt: Long?,
     @ColumnInfo(name = "last_protocol_version") val lastProtocolVersion: String?,
     @ColumnInfo(name = "tools_expire_at") val toolsExpireAt: Long?,
+    @ColumnInfo(defaultValue = "0") val revision: Long = 0,
+    @ColumnInfo(name = "state_version", defaultValue = "0") val stateVersion: Long = 0,
+    @ColumnInfo(name = "credential_update_pending", defaultValue = "0") val credentialUpdatePending: Boolean = false,
 )
 
 private val mcpJson = Json {
@@ -46,6 +49,9 @@ internal fun McpServerSetting.toEntity(): McpServerEntity = McpServerEntity(
     lastRefreshedAt = lastRefreshedAt,
     lastProtocolVersion = lastProtocolVersion,
     toolsExpireAt = toolsExpireAt,
+    revision = revision,
+    stateVersion = stateVersion,
+    credentialUpdatePending = credentialUpdatePending,
 )
 
 internal fun McpServerEntity.toDomain(): McpServerSetting = McpServerSetting(
@@ -66,4 +72,7 @@ internal fun McpServerEntity.toDomain(): McpServerSetting = McpServerSetting(
     lastRefreshedAt = lastRefreshedAt,
     lastProtocolVersion = lastProtocolVersion,
     toolsExpireAt = toolsExpireAt,
+    revision = revision,
+    stateVersion = stateVersion,
+    credentialUpdatePending = credentialUpdatePending,
 )

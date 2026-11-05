@@ -40,6 +40,11 @@ import io.github.bytejuno.theta.ui.components.ListEmptyState
 import io.github.bytejuno.theta.ui.components.MiuixDialogActions
 import io.github.bytejuno.theta.ui.components.MiuixScaffoldPage
 import io.github.bytejuno.theta.ui.navigation.AppRoute
+import io.github.bytejuno.theta.ui.model.McpConnectionStatus
+import io.github.bytejuno.theta.ui.model.toConnectionUiState
+import java.text.DateFormat
+import java.util.Date
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -85,6 +90,9 @@ internal fun McpServersScreen(
             }
         },
     ) {
+        item(key = "policy") {
+            McpPolicyNotice()
+        }
         item(key = "servers") {
             SmallTitle(stringResource(R.string.mcp_configured_servers, servers.size))
             Card(
@@ -108,11 +116,7 @@ internal fun McpServersScreen(
                     servers.forEach { server ->
                         ArrowPreference(
                             title = server.name,
-                            summary = stringResource(
-                                R.string.mcp_server_row_summary,
-                                server.activeTools.size,
-                                server.tools.size,
-                            ),
+                            summary = serverSummary(server),
                             onClick = { onNavigate(AppRoute.McpServerDetail(server.id)) },
                         )
                     }
@@ -133,7 +137,7 @@ internal fun McpServersScreen(
     WindowDialog(
         show = showAdd,
         title = stringResource(R.string.mcp_add_server),
-        onDismissRequest = { if (!working) showAdd = false },
+        onDismissRequest = { if (!working) { token = ""; showAdd = false } },
     ) {
         // 只有表单滚动，按钮固定在底部：输入法弹出或错误较长时确认操作仍然可达。
         Column(modifier = Modifier.fillMaxWidth().heightIn(max = 520.dp)) {
@@ -144,6 +148,10 @@ internal fun McpServersScreen(
                     .weight(1f, fill = false)
                     .verticalScroll(rememberScrollState()),
             ) {
+                Text(
+                    text = stringResource(R.string.mcp_remote_data_notice),
+                    style = MiuixTheme.textStyles.footnote2,
+                )
                 TextField(
                     value = name,
                     onValueChange = { name = it },
@@ -187,7 +195,8 @@ internal fun McpServersScreen(
                     stringResource(R.string.mcp_add_server)
                 },
                 confirmEnabled = !working,
-                onCancel = { showAdd = false },
+                cancelEnabled = !working,
+                onCancel = { token = ""; showAdd = false },
                 onConfirm = {
                     val normalizedName = name.trim()
                     val normalizedUrl = url.trim()
@@ -228,7 +237,7 @@ internal fun McpServersScreen(
                                 Toast.LENGTH_SHORT,
                             ).show()
                         }.onFailure {
-                            error = it.message ?: resources.getString(R.string.mcp_connection_failed)
+                            error = resources.getString(R.string.mcp_connection_failed)
                         }
                     }
                 },
@@ -248,10 +257,33 @@ internal fun McpServerDetailScreen(
     val servers by McpServerRepository.serversFlow().collectAsState(initial = emptyList())
     val server = servers.firstOrNull { it.id == serverId }
     var working by remember { mutableStateOf(false) }
-    var pendingRiskyTool by remember { mutableStateOf<McpToolDefinition?>(null) }
+    // Freeze both the reviewed definition and revision while the grant dialog is open.
+    var pendingGrant by remember(serverId) {
+        mutableStateOf<Pair<McpServerSetting, McpToolDefinition>?>(null)
+    }
     var showDelete by remember { mutableStateOf(false) }
     var showToken by remember { mutableStateOf(false) }
-    var token by remember { mutableStateOf("") }
+    var token by remember(serverId) { mutableStateOf("") }
+    var operationError by remember(serverId) { mutableStateOf<String?>(null) }
+
+    fun change(onSuccess: () -> Unit = {}, block: suspend () -> Unit) {
+        if (working) return
+        working = true
+        operationError = null
+        scope.launch {
+            try {
+                withContext(Dispatchers.IO) { block() }
+                onSuccess()
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                // Repository messages may contain remote metadata; do not expose credentials.
+                operationError = resources.getString(R.string.mcp_change_failed)
+            } finally {
+                working = false
+            }
+        }
+    }
 
     MiuixScaffoldPage(
         title = server?.name ?: stringResource(R.string.route_mcp_server_detail),
@@ -260,17 +292,19 @@ internal fun McpServerDetailScreen(
             IconButton(
                 enabled = server != null && !working,
                 onClick = {
+                    working = true
+                    operationError = null
                     scope.launch {
-                        working = true
                         val result = withContext(Dispatchers.IO) {
                             runCatching { McpServerManager.refresh(serverId) }
                         }
                         working = false
+                        if (result.isFailure) operationError = resources.getString(R.string.mcp_refresh_failed)
                         Toast.makeText(
                             context,
                             result.fold(
                                 onSuccess = { resources.getString(R.string.mcp_refreshed, it.tools.size) },
-                                onFailure = { it.message ?: resources.getString(R.string.mcp_refresh_failed) },
+                                onFailure = { resources.getString(R.string.mcp_refresh_failed) },
                             ),
                             Toast.LENGTH_SHORT,
                         ).show()
@@ -290,6 +324,21 @@ internal fun McpServerDetailScreen(
             }
             return@MiuixScaffoldPage
         }
+        item(key = "policy") { McpPolicyNotice() }
+        item(key = "status") {
+            Text(
+                text = serverSummary(server),
+                style = MiuixTheme.textStyles.body2,
+                modifier = Modifier.padding(horizontal = 24.dp).padding(bottom = 12.dp),
+            )
+            operationError?.let { message ->
+                Text(
+                    text = message,
+                    color = MiuixTheme.colorScheme.error,
+                    modifier = Modifier.padding(horizontal = 24.dp).padding(bottom = 12.dp),
+                )
+            }
+        }
         item(key = "server") {
             SmallTitle(stringResource(R.string.mcp_server_settings))
             Card(
@@ -301,10 +350,9 @@ internal fun McpServerDetailScreen(
                     title = stringResource(R.string.mcp_enable_server),
                     summary = server.url,
                     checked = server.enabled,
+                    enabled = !working && !server.credentialUpdatePending,
                     onCheckedChange = { enabled ->
-                        scope.launch(Dispatchers.IO) {
-                            McpServerRepository.update(server.copy(enabled = enabled))
-                        }
+                        change { McpServerRepository.update(server.copy(enabled = enabled)) }
                     },
                 )
                 ArrowPreference(
@@ -316,7 +364,7 @@ internal fun McpServerDetailScreen(
                             R.string.mcp_no_authentication
                         }
                     ),
-                    onClick = { showToken = true },
+                    onClick = { if (!working) { token = ""; showToken = true } },
                 )
             }
         }
@@ -348,12 +396,13 @@ internal fun McpServerDetailScreen(
                             title = tool.title.ifBlank { tool.name },
                             summary = toolSummary(tool),
                             checked = checked,
+                            enabled = !working && !server.credentialUpdatePending,
                             onCheckedChange = { enabled ->
-                                if (enabled && tool.readOnlyHint != true) {
-                                    pendingRiskyTool = tool
+                                if (enabled) {
+                                    pendingGrant = server to tool
                                 } else {
-                                    scope.launch(Dispatchers.IO) {
-                                        McpServerRepository.setToolEnabled(serverId, tool.name, enabled)
+                                    change {
+                                        McpServerRepository.setToolEnabled(serverId, tool.name, false, server.revision)
                                     }
                                 }
                             },
@@ -372,30 +421,43 @@ internal fun McpServerDetailScreen(
                     title = stringResource(R.string.mcp_delete_server),
                     titleColor = BasicComponentDefaults.titleColor(color = MiuixTheme.colorScheme.error),
                     summary = stringResource(R.string.mcp_delete_server_summary),
-                    onClick = { showDelete = true },
+                    onClick = { if (!working) showDelete = true },
                 )
             }
         }
     }
 
-    pendingRiskyTool?.let { tool ->
+    pendingGrant?.let { (reviewedServer, tool) ->
         WindowDialog(
             show = true,
             title = stringResource(R.string.mcp_enable_risky_tool),
-            summary = stringResource(R.string.mcp_enable_risky_tool_summary, tool.name, server?.name.orEmpty()),
-            onDismissRequest = { pendingRiskyTool = null },
+            summary = stringResource(R.string.mcp_enable_risky_tool_summary, tool.name, reviewedServer.name),
+            onDismissRequest = { if (!working) pendingGrant = null },
         ) {
+            Column(modifier = Modifier.heightIn(max = 360.dp).verticalScroll(rememberScrollState())) {
+                Text(toolSummary(tool), style = MiuixTheme.textStyles.body2)
+                Text(
+                    text = stringResource(R.string.mcp_tool_schema, tool.inputSchemaJson),
+                    style = MiuixTheme.textStyles.footnote2,
+                    modifier = Modifier.padding(top = 12.dp),
+                )
+                operationError?.let { Text(it, color = MiuixTheme.colorScheme.error) }
+            }
             MiuixDialogActions(
                 confirmText = stringResource(R.string.mcp_enable_tool),
-                destructive = true,
-                onCancel = { pendingRiskyTool = null },
+                confirmEnabled = !working && server?.revision == reviewedServer.revision,
+                cancelEnabled = !working,
+                destructive = tool.readOnlyHint != true,
+                onCancel = { if (!working) pendingGrant = null },
                 onConfirm = {
-                    scope.launch(Dispatchers.IO) {
-                        McpServerRepository.setToolEnabled(serverId, tool.name, true)
+                    change(onSuccess = { pendingGrant = null }) {
+                        McpServerRepository.setToolEnabled(serverId, tool.name, true, reviewedServer.revision)
                     }
-                    pendingRiskyTool = null
                 },
             )
+            if (server?.revision != reviewedServer.revision) {
+                Text(stringResource(R.string.mcp_grant_stale), color = MiuixTheme.colorScheme.error)
+            }
         }
     }
 
@@ -403,7 +465,7 @@ internal fun McpServerDetailScreen(
         show = showToken,
         title = stringResource(R.string.mcp_update_token),
         summary = stringResource(R.string.mcp_update_token_summary),
-        onDismissRequest = { showToken = false },
+        onDismissRequest = { if (!working) { token = ""; showToken = false } },
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
             TextField(
@@ -411,29 +473,32 @@ internal fun McpServerDetailScreen(
                 onValueChange = { token = it },
                 label = stringResource(R.string.mcp_bearer_token),
                 singleLine = true,
+                enabled = !working,
                 visualTransformation = PasswordVisualTransformation(),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                 modifier = Modifier.fillMaxWidth(),
             )
+            operationError?.let { Text(it, color = MiuixTheme.colorScheme.error) }
             MiuixDialogActions(
                 confirmText = stringResource(R.string.action_save),
-                onCancel = { showToken = false },
+                confirmEnabled = !working,
+                cancelEnabled = !working,
+                onCancel = { if (!working) { token = ""; showToken = false } },
                 onConfirm = {
                     server?.let { current ->
-                        scope.launch(Dispatchers.IO) {
+                        val newToken = token
+                        change(onSuccess = { token = ""; showToken = false }) {
                             McpServerRepository.update(
                                 current.copy(
-                                    authorizationType = if (token.isBlank()) {
+                                    authorizationType = if (newToken.isBlank()) {
                                         McpAuthorizationType.NONE
                                     } else {
                                         McpAuthorizationType.BEARER
                                     },
                                 ),
-                                bearerToken = token,
+                                bearerToken = newToken,
                             )
                         }
-                        token = ""
-                        showToken = false
                     }
                 },
             )
@@ -444,20 +509,48 @@ internal fun McpServerDetailScreen(
         show = showDelete,
         title = stringResource(R.string.mcp_delete_server),
         summary = stringResource(R.string.mcp_delete_confirm, server?.name.orEmpty()),
-        onDismissRequest = { showDelete = false },
+        onDismissRequest = { if (!working) showDelete = false },
     ) {
+        operationError?.let { Text(it, color = MiuixTheme.colorScheme.error) }
         MiuixDialogActions(
             confirmText = stringResource(R.string.ui_delete_3755f5),
             destructive = true,
-            onCancel = { showDelete = false },
+            confirmEnabled = !working,
+            cancelEnabled = !working,
+            onCancel = { if (!working) showDelete = false },
             onConfirm = {
-                scope.launch {
-                    withContext(Dispatchers.IO) { McpServerRepository.delete(serverId) }
-                    onBack()
-                }
+                change(onSuccess = onBack) { McpServerRepository.delete(serverId) }
             },
         )
     }
+}
+
+@Composable
+private fun McpPolicyNotice() {
+    Text(
+        text = stringResource(R.string.mcp_authorization_policy),
+        style = MiuixTheme.textStyles.footnote2,
+        modifier = Modifier.padding(horizontal = 24.dp).padding(bottom = 12.dp),
+    )
+}
+
+@Composable
+private fun serverSummary(server: McpServerSetting): String {
+    val state = server.toConnectionUiState()
+    val status = stringResource(when (state.status) {
+        McpConnectionStatus.CREDENTIAL_UPDATE_PENDING -> R.string.mcp_credentials_pending
+        McpConnectionStatus.DISABLED -> R.string.mcp_connection_disabled
+        McpConnectionStatus.NEEDS_GRANT -> R.string.mcp_connection_needs_grant
+        McpConnectionStatus.ENABLED -> R.string.mcp_connection_enabled
+    })
+    val lastCheck = state.lastCheckedAt?.let {
+        stringResource(R.string.mcp_last_checked, DateFormat.getDateTimeInstance().format(Date(it)))
+    } ?: stringResource(R.string.mcp_never_checked)
+    return listOf(
+        stringResource(R.string.mcp_connection_status, status),
+        stringResource(R.string.mcp_granted_count, state.grantedToolCount, state.cachedToolCount),
+        lastCheck,
+    ).joinToString("\n")
 }
 
 @Composable

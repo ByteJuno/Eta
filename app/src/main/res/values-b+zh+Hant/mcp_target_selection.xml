@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="mcp_target_title">選擇本輪使用的帳戶</string>
+    <string name="mcp_target_scope">請為本輪任務明確選擇一個或多個遠端連線。預設不選取任何帳戶；名稱相同不代表同一帳戶。此選擇不授予工具權限，也不擴大入口權限。離開此對話或前景會取消待確認選擇。</string>
+    <string name="mcp_target_connection_id">連線 ID：%1$s</string>
+    <string name="mcp_target_confirm">使用選取帳戶</string>
+    <string name="mcp_target_deny">不繼續</string>
+</resources>

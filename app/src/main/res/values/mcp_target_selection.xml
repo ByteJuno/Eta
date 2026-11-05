@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="mcp_target_title">Choose accounts for this run</string>
+    <string name="mcp_target_scope">Choose one or more remote connections for this run. Nothing is selected by default; matching names do not mean the same account. This choice does not authorize tools or expand entry-point permissions. Leaving this conversation or the foreground cancels the pending choice.</string>
+    <string name="mcp_target_connection_id">Connection ID: %1$s</string>
+    <string name="mcp_target_confirm">Use selected accounts</string>
+    <string name="mcp_target_deny">Do not continue</string>
+</resources>

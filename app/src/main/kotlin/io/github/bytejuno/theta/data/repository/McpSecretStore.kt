@@ -11,14 +11,20 @@ import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
 
 /** MCP 凭据只以 Android Keystore 密文保存在 App 私有偏好中。 */
-internal class McpSecretStore(context: Context) {
+internal interface McpCredentialStore {
+    fun bearerToken(serverId: String): String?
+    fun setBearerToken(serverId: String, token: String)
+    fun clear(serverId: String)
+}
+
+internal class McpSecretStore(context: Context) : McpCredentialStore {
     private val preferences = context.applicationContext.getSharedPreferences(
         PREFERENCES_NAME,
         Context.MODE_PRIVATE,
     )
 
     @Synchronized
-    fun bearerToken(serverId: String): String? {
+    override fun bearerToken(serverId: String): String? {
         val encoded = preferences.getString(tokenKey(serverId), null) ?: return null
         return runCatching {
             val payload = Base64.decode(encoded, Base64.NO_WRAP)
@@ -35,7 +41,7 @@ internal class McpSecretStore(context: Context) {
     }
 
     @Synchronized
-    fun setBearerToken(serverId: String, token: String) {
+    override fun setBearerToken(serverId: String, token: String) {
         val normalized = token.trim()
         if (normalized.isBlank()) {
             clear(serverId)
@@ -53,7 +59,7 @@ internal class McpSecretStore(context: Context) {
     }
 
     @Synchronized
-    fun clear(serverId: String) {
+    override fun clear(serverId: String) {
         check(preferences.edit().remove(tokenKey(serverId)).commit()) { "MCP 凭据删除失败" }
     }
 

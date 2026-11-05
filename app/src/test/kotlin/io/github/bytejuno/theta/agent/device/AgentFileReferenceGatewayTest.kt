@@ -25,6 +25,8 @@ class AgentFileReferenceGatewayTest {
 
     @Test
     fun appReadableFilesAndDirectoriesNeverAskForRoot() {
+        // Production accepts Android/POSIX absolute paths, not Windows drive-letter paths.
+        org.junit.Assume.assumeTrue("Requires a POSIX filesystem", File.separatorChar == '/')
         val file = temporaryFolder.newFile("report.txt").apply { writeText("ordinary file") }
         val gateway = AgentFileReferenceGateway(rootAvailable = { false }) {
             error("普通路径不应执行 Root 校验")
@@ -53,7 +55,7 @@ class AgentFileReferenceGatewayTest {
         val result = gateway.resolveDocumentUri(uri, AgentFileReferenceKind.File)
             as AgentFileReferenceGateway.Resolution.Success
         val imported = File(result.reference.absolutePath)
-        assertTrue(imported.path.startsWith(File(context.filesDir, "terminal-user/workspace/imports").path + "/"))
+        assertTrue(imported.toPath().startsWith(File(context.filesDir, "terminal-user/workspace/imports").toPath()))
         assertEquals("授权内容", imported.readText())
         imported.parentFile?.deleteRecursively()
     }

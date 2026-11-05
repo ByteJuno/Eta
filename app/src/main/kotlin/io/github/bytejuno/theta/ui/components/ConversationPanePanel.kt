@@ -141,8 +141,7 @@ internal fun ConversationPanePanel(
     onOpenRootSettings: () -> Unit,
     onOpenAccessibilitySettings: () -> Unit,
     onOpenModelProviders: () -> Unit,
-    onOpenTools: () -> Unit,
-    onOpenSkills: () -> Unit,
+    onOpenExtensions: () -> Unit,
     onOpenCharacters: () -> Unit,
     onOpenPermissions: () -> Unit,
     onOpenTasks: () -> Unit,
@@ -241,9 +240,8 @@ internal fun ConversationPanePanel(
                             )
                             AnimatedVisibility(visible = moreExpanded) {
                                 Column(Modifier.padding(start = 16.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                                    PaneShortcut(MiuixIcons.GridView, stringResource(R.string.ui_tool_ability_9f0f80), onOpenTools)
+                                    PaneShortcut(MiuixIcons.GridView, stringResource(R.string.route_extensions), onOpenExtensions)
                                     PaneShortcut(MiuixIcons.Layers, stringResource(R.string.sidebar_models), onOpenModelProviders)
-                                    PaneShortcut(MiuixIcons.Notes, stringResource(R.string.sidebar_skills), onOpenSkills)
                                 }
                             }
                         }

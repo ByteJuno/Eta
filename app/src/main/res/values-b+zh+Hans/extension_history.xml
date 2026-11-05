@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="calendar_unknown_title">待核查的日历操作</string>
+    <string name="calendar_unknown_summary">查看 UNKNOWN 记录，不重放操作。</string>
+    <string name="calendar_unknown_notice">最多显示 100 条 UNKNOWN 记录，较早记录优先。副作用可能已经发生，请先核查日历；本页不会重试、确认成功或回滚变更。</string>
+    <string name="calendar_unknown_empty">本地账本未发现 UNKNOWN 记录，不代表所有日历变更都已成功。</string>
+    <string name="calendar_unknown_record">UNKNOWN（结果不确定）\n操作：%1$s\n任务：%2$s\n工具：%3$s\n连接：%4$s</string>
+    <string name="extension_history_loading">正在读取本地记录…</string>
+    <string name="extension_history_failed">无法读取本地记录，未重试任何操作。</string>
+    <string name="plugin_calls_title">最近扩展调用</string>
+    <string name="plugin_calls_summary">本地元数据：连接、工具、状态与耗时。</string>
+    <string name="plugin_calls_notice">最多显示最近 100 条调用，新记录优先。ADMITTED 表示进行中；UNKNOWN 需核查，不应自动重放。状态是宿主证据，不保证远端回滚。查看记录不会发起网络请求。</string>
+    <string name="plugin_calls_empty">暂无本地调用记录。</string>
+    <string name="plugin_calls_record">状态：%1$s\n连接：%2$s\n工具：%3$s\n任务：%4$s\n调用：%5$s\n代次：%6$s\n开始：%7$s\n耗时：%8$s 毫秒</string>
+</resources>

@@ -1,19 +1,25 @@
 package io.github.bytejuno.theta.agent.mcp
 
 import io.github.bytejuno.theta.data.model.McpServerSetting
+import io.github.bytejuno.theta.data.model.retainedMcpToolGrants
 import io.github.bytejuno.theta.data.repository.McpServerRepository
 
 internal object McpServerManager {
     fun discover(
         server: McpServerSetting,
         bearerToken: String?,
+        registerCancellation: ((() -> Unit) -> AutoCloseable)? = null,
     ): McpServerSetting = McpHttpClient(server, bearerToken).use { client ->
-        val discovery = client.discoverTools()
-        val availableNames = discovery.tools.mapTo(mutableSetOf()) { it.name }
+        val cancellation = registerCancellation?.invoke(client::close)
+        val discovery = try {
+            client.discoverTools()
+        } finally {
+            cancellation?.close()
+        }
         val refreshedAt = System.currentTimeMillis()
         server.copy(
             tools = discovery.tools,
-            enabledToolNames = server.enabledToolNames.intersect(availableNames),
+            enabledToolNames = retainedMcpToolGrants(server, discovery.tools),
             lastRefreshedAt = refreshedAt,
             lastProtocolVersion = discovery.protocolVersion,
             toolsExpireAt = discovery.cacheTtlMs?.let { ttl ->
@@ -23,11 +29,11 @@ internal object McpServerManager {
     }
 
     suspend fun refresh(serverId: String): McpServerSetting {
-        val server = requireNotNull(McpServerRepository.serverById(serverId)) {
-            "MCP 服务器不存在"
+        val snapshot = requireNotNull(McpServerRepository.captureSnapshot(serverId)) {
+            "MCP 连接不存在或凭据更新未完成"
         }
-        val refreshed = discover(server, McpServerRepository.bearerToken(serverId))
-        McpServerRepository.update(refreshed)
-        return refreshed
+        // Network happens outside the repository lock; the write rejects stale stateVersion/revision.
+        val refreshed = discover(snapshot.server, snapshot.bearerToken)
+        return McpServerRepository.update(refreshed)
     }
 }

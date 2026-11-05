@@ -29,6 +29,14 @@ internal class SubagentExecutor(
     private val executionContext: TerminalExecutionContext?,
     private val onProgress: (AgentEvent.SubagentProgress) -> Unit,
     private val nanoTime: () -> Long = System::nanoTime,
+    // Captured together with mcpTools by the host; excludes tokens and other credentials.
+    private val toolBindingFingerprint: String? = null,
+    // The host owns resource cleanup. In particular, a child must not close shared local tools.
+    private val executorForChild: ((
+        childController: AgentRunController,
+        subagentId: String,
+        parentCallId: String,
+    ) -> AgentModelClient.ToolExecutor)? = null,
 ) {
     private val latestSnapshots = ConcurrentHashMap<String, String>()
 
@@ -72,6 +80,13 @@ internal class SubagentExecutor(
                     "SUBAGENT_NOT_FOUND",
                     "未找到可续接的 Subagent：$resumeId（可能已过期或不属于当前会话）",
                 )
+            // Check before acquiring or exposing history, even if the previous run produced none.
+            if (!existing.matchesToolBinding(toolBindingFingerprint, mcpTools.length() > 0)) {
+                return errorResult(
+                    "SUBAGENT_TOOL_BINDING_MISMATCH",
+                    "Subagent $resumeId 的工具绑定已变化或旧上下文缺少绑定指纹；拒绝复用旧 history，请创建新的 Subagent。",
+                )
+            }
             if (!existing.running.compareAndSet(false, true)) {
                 return errorResult(
                     "SUBAGENT_ALREADY_RUNNING",
@@ -90,7 +105,7 @@ internal class SubagentExecutor(
                 customRole = customRole,
                 customTools = customTools,
             )
-            entry = SubagentSessionStore.create(conversationKey, profile)
+            entry = SubagentSessionStore.create(conversationKey, profile, toolBindingFingerprint)
             priorHistory = emptyList()
         }
 
@@ -132,26 +147,8 @@ internal class SubagentExecutor(
             )
         }
 
-        publishSnapshot(force = true)
-
-        val childToolExecutor = AgentModelClient.ToolExecutor { subCall ->
-            childController.throwIfCancelled()
-            if (!profile.isToolAllowed(subCall.name)) {
-                AgentModelClient.ToolResult(
-                    content = JSONObject()
-                        .put("ok", false)
-                        .put("code", "SUBAGENT_TOOL_FORBIDDEN")
-                        .put(
-                            "message",
-                            "当前 Subagent (${profile.name}) 不允许调用工具 ${subCall.name}",
-                        )
-                        .toString(),
-                )
-            } else {
-                baseToolExecutor.execute(subCall)
-            }
-        }
-
+        val sessionId = "$conversationKey-$subagentId"
+        val operationId = "${toolCall.id}-$subagentId"
         val subagentConfig = resolvedConfig.copy(
             systemPrompt = profile.buildSystemPrompt(),
             subagentTools = false,
@@ -159,6 +156,9 @@ internal class SubagentExecutor(
         )
 
         return try {
+            childController.throwIfCancelled()
+            publishSnapshot(force = true)
+            val childToolExecutor = createChildToolExecutor(profile, childController, subagentId, toolCall.id)
             val response = AgentModelClient.complete(
                 config = subagentConfig,
                 prompt = prompt,
@@ -170,8 +170,8 @@ internal class SubagentExecutor(
                 additionalTools = profile.filterTools(mcpTools),
                 executionContext = executionContext,
                 capabilitiesProvider = capabilitiesProvider,
-                sessionId = "$conversationKey-$subagentId",
-                operationId = "${toolCall.id}-$subagentId",
+                sessionId = sessionId,
+                operationId = operationId,
                 toolFilter = profile::filterTools,
                 onEvent = { childEvent ->
                     val force = tracker.onChildEvent(childEvent)
@@ -263,7 +263,31 @@ internal class SubagentExecutor(
                 command = latestSnapshots[toolCall.id],
             )
         } finally {
+            // Releases only resources registered to this child, including on successful completion.
+            // The host factory must not register shared local tools with this controller.
+            childController.cancel()
             controllerBinding.close()
+        }
+    }
+
+    /** Bind once per child, not once per thread: batch dispatch may change worker threads. */
+    internal fun createChildToolExecutor(
+        profile: SubagentProfile,
+        childController: AgentRunController,
+        subagentId: String,
+        parentCallId: String,
+    ): AgentModelClient.ToolExecutor {
+        val delegate = executorForChild?.invoke(childController, subagentId, parentCallId) ?: baseToolExecutor
+        return AgentModelClient.ToolExecutor { subCall ->
+            childController.throwIfCancelled()
+            if (!profile.isToolAllowed(subCall.name)) {
+                errorResult(
+                    "SUBAGENT_TOOL_FORBIDDEN",
+                    "当前 Subagent (${profile.name}) 不允许调用工具 ${subCall.name}",
+                )
+            } else {
+                delegate.execute(subCall)
+            }
         }
     }
 

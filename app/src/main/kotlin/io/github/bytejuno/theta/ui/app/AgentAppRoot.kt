@@ -82,6 +82,7 @@ import io.github.bytejuno.theta.ui.screens.characters.CharacterMemoryScreen
 import io.github.bytejuno.theta.ui.screens.characters.CharacterPersonaScreen
 import io.github.bytejuno.theta.ui.screens.enhance.SystemEnhanceScreen
 import io.github.bytejuno.theta.ui.screens.home.AgentHomeScreen
+import io.github.bytejuno.theta.ui.screens.extensions.ExtensionsScreen
 import io.github.bytejuno.theta.ui.screens.mcp.McpServerDetailScreen
 import io.github.bytejuno.theta.ui.screens.mcp.McpServersScreen
 import io.github.bytejuno.theta.ui.screens.memory.AgentMemoryScreen
@@ -190,6 +191,14 @@ fun AgentAppRoot(
     }
 
     var conversationPaneOpen by rememberSaveable { mutableStateOf(false) }
+    io.github.bytejuno.theta.ui.components.CalendarApprovalHost(
+        runId = agentState.calendarApprovalRunId,
+        visible = backStack.lastOrNull() == AppRoute.Home && !conversationPaneOpen,
+    )
+    io.github.bytejuno.theta.ui.components.McpTargetSelectionHost(
+        runId = agentState.calendarApprovalRunId,
+        visible = backStack.lastOrNull() == AppRoute.Home && !conversationPaneOpen,
+    )
     var conversationRenameTarget by remember { mutableStateOf<ConversationSummaryUi?>(null) }
     var conversationDeleteTarget by remember { mutableStateOf<ConversationSummaryUi?>(null) }
     var conversationExportTarget by remember { mutableStateOf<ConversationSummaryUi?>(null) }
@@ -380,8 +389,7 @@ fun AgentAppRoot(
             onConversationDelete = { conversation ->
                 conversationDeleteTarget = conversation
             },
-            onOpenTools = { pushRoute(AppRoute.Tools) },
-            onOpenSkills = { pushRoute(AppRoute.Skills) },
+            onOpenExtensions = { pushRoute(AppRoute.Extensions) },
             onOpenCharacters = { pushRoute(AppRoute.Characters) },
             onOpenNotifications = { pushRoute(AppRoute.Notifications) },
             notificationCount = notificationCenter.pendingCount,
@@ -501,6 +509,9 @@ fun AgentAppRoot(
                         onOpenEnvironment = { pushRoute(AppRoute.LinuxEnvironment) },
                     )
                 }
+            }
+            entry<AppRoute.Extensions>(swipeDismiss = swipeDismiss) {
+                ExtensionsScreen(onNavigate = { pushRoute(it) }, onBack = ::popRoute)
             }
             entry<AppRoute.Tools>(swipeDismiss = swipeDismiss) {
                 AgentToolsScreen(

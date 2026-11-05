@@ -274,6 +274,17 @@ internal class AgentLocalTools(
         "本轮主屏操作未获允许，未执行；请在 Eta 对话框、悬浮窗或通知中授权。拒绝、超时、取消后本轮不再请求。",
     )
 
+    /** Host-only preparation; not a model-visible tool and never performs a calendar mutation. */
+    fun prepareCalendarWriteForApproval(tool: String, args: JSONObject): JSONObject {
+        if (closed.get() || isRunCancelled() || hasPendingSteering()) {
+            return JSONObject(errorResult("TOOL_CANCELLED", "任务已停止"))
+        }
+        if (!deviceSensitiveActionToolsEnabled()) {
+            return JSONObject(errorResult("DEVICE_ACTION_DISABLED", "设备写入权限未开启"))
+        }
+        return structuredDeviceTools.prepareCalendarWrite(tool, args)
+    }
+
     override fun execute(toolCall: AgentModelClient.ToolCall): AgentModelClient.ToolResult =
         if (AgentInteractionLeaseCoordinator.requiresLease(toolCall.name)) {
             withInteractionLease { executeToolCall(toolCall) }

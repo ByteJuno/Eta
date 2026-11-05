@@ -30,6 +30,8 @@ import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.InfiniteProgressIndicator
 import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.TextButton
+import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.window.WindowDialog
 
@@ -66,6 +68,13 @@ fun AgentSkillsScreen(
         val userInstalled = installed.filter { it.canDeleteUserSkill }
         val removed = state.skills.filter { !it.installed }
 
+        item(key = "permissions") {
+            Text(
+                text = stringResource(R.string.extensions_skills_summary),
+                style = MiuixTheme.textStyles.footnote2,
+                modifier = Modifier.padding(horizontal = 24.dp).padding(bottom = 12.dp),
+            )
+        }
         item(key = "zip-import") {
             SmallTitle(stringResource(R.string.ui_install_087db6))
             Card(

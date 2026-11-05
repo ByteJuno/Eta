@@ -113,6 +113,17 @@ class NativeAppOperationsTest {
     }
 
     @Test
+    fun calendarWriteValidationFailureIsRejectedBeforeProviderMutation() {
+        val provider = FakeProvider()
+        val result = PhoneOperations.execute(context, "create_calendar_event",
+            event().put("end_time", "invalid"), access = provider)
+        assertEquals("INVALID_ARGUMENT", result.getString("code"))
+        assertEquals("rejected", result.getString("status"))
+        assertFalse(result.getBoolean("verified"))
+        assertEquals(0, provider.batches)
+    }
+
+    @Test
     fun nativeFailureAfterDispatchIsNotReportedAsSafeToRetry() {
         val provider = FakeProvider().apply { failBatch = true }
         val result =
@@ -151,7 +162,7 @@ class NativeAppOperationsTest {
             )
         assertEquals("NOTES_NOT_READY", result.getString("code"))
         assertNull(provider.lastInsert)
-        assertFalse(result.has("status"))
+        assertEquals("rejected", result.getString("status"))
     }
 
     @Test
@@ -223,6 +234,106 @@ class NativeAppOperationsTest {
         assertEquals(1, provider.calls.count { it == "add_alarm" })
     }
 
+    @Test
+    fun calendarPreparePinsDefaultTargetAndIsNotAModelTool() {
+        val provider = FakeProvider()
+        val prepared = prepare(provider, "create_calendar_event", event())
+        assertTrue(prepared.toString(), prepared.getBoolean("ok"))
+        val args = prepared.getJSONObject("normalized_arguments")
+        assertEquals("1", args.getString("calendar_id"))
+        assertEquals("Asia/Shanghai", args.getString("timezone"))
+        assertEquals("2026-10-05T02:00:00Z", args.getString("start_time"))
+        assertEquals(0, provider.batches)
+        assertTrue(provider.events.isEmpty())
+        assertFalse("prepare_calendar_write" in PhoneOperation.tools)
+        provider.calendarCount = 2 // New default candidates cannot redirect an approved create.
+        val result = PhoneOperations.execute(context, "create_calendar_event",
+            args.put("expected_target_digest", prepared.getString("target_digest")), access = provider)
+        assertTrue(result.toString(), result.getBoolean("verified"))
+        assertEquals("1", provider.events.values.single().getAsString("calendar_id"))
+    }
+
+    @Test
+    fun calendarPrepareValidatesWholeBatchAndPinsEveryItem() {
+        val provider = FakeProvider()
+        val prepared = prepare(provider, "create_calendar_events", JSONObject().put("events",
+            org.json.JSONArray().put(event()).put(event().put("title", "Second"))))
+        val items = prepared.getJSONObject("normalized_arguments").getJSONArray("events")
+        assertEquals(2, items.length())
+        repeat(2) { assertEquals("1", items.getJSONObject(it).getString("calendar_id")) }
+        assertEquals(0, provider.batches)
+        val invalid = prepare(provider, "create_calendar_events", JSONObject().put("events",
+            org.json.JSONArray().put(event()).put(event().put("end_time", "invalid"))))
+        assertFalse(invalid.getBoolean("ok"))
+        assertEquals(0, provider.batches)
+    }
+
+    @Test
+    fun calendarApprovalRejectsChangedAccountAndChangedEventWithoutWriting() {
+        val provider = FakeProvider()
+        val prepared = prepare(provider, "create_calendar_event", event())
+        provider.accountName = "other-account"
+        val rejected = PhoneOperations.execute(context, "create_calendar_event",
+            prepared.getJSONObject("normalized_arguments").put("expected_target_digest", prepared.getString("target_digest")), access = provider)
+        assertEquals("APPROVAL_TARGET_CHANGED", rejected.getString("code"))
+        assertEquals("rejected", rejected.getString("status"))
+        assertEquals(0, provider.batches)
+        PhoneOperations.execute(context, "create_calendar_event", event(), access = provider)
+        val update = prepare(provider, "update_calendar_event", JSONObject().put("event_id", "1").put("title", "Approved"))
+        val delete = prepare(provider, "delete_calendar_event", JSONObject().put("event_id", "1"))
+        assertTrue(update.toString(), update.getBoolean("ok"))
+        assertTrue(delete.toString(), delete.getBoolean("ok"))
+        assertEquals("1", update.getJSONObject("normalized_arguments").getString("calendar_id"))
+        provider.events[1L]!!.put("title", "Changed elsewhere")
+        for ((tool, result) in listOf("update_calendar_event" to update, "delete_calendar_event" to delete)) {
+            val response = PhoneOperations.execute(context, tool, result.getJSONObject("normalized_arguments")
+                .put("expected_target_digest", result.getString("target_digest")), access = provider)
+            assertEquals("APPROVAL_TARGET_CHANGED", response.getString("code"))
+        }
+        assertEquals(1, provider.batches)
+        assertNull(provider.deletedUri)
+    }
+
+    @Test
+    fun preparedUpdateRechecksAndExecutesNormalizedArguments() {
+        val provider = FakeProvider()
+        PhoneOperations.execute(context, "create_calendar_event", event(), access = provider)
+        val prepared = prepare(provider, "update_calendar_event", JSONObject().put("event_id", "1").put("title", "Approved"))
+        val response = PhoneOperations.execute(context, "update_calendar_event", prepared.getJSONObject("normalized_arguments")
+            .put("expected_target_digest", prepared.getString("target_digest")), access = provider)
+        assertTrue(response.toString(), response.getBoolean("verified"))
+        assertEquals("Approved", provider.events[1L]!!.getAsString("title"))
+    }
+
+    @Test
+    fun createReadbackFailureRetainsEveryCommittedId() {
+        val provider = FakeProvider().apply { failReadAfterMutation = true }
+        val result = PhoneOperations.execute(context, "create_calendar_events", JSONObject().put("events",
+            org.json.JSONArray().put(event()).put(event())), access = provider)
+        assertEquals("OPERATION_UNCONFIRMED", result.getString("code"))
+        assertEquals("unconfirmed", result.getString("status"))
+        assertEquals(listOf("1", "2"), (0 until result.getJSONArray("event_ids").length()).map { result.getJSONArray("event_ids").getString(it) })
+        assertEquals(2, result.getJSONArray("events").length())
+    }
+
+    @Test
+    fun updateAndDeleteReadbackFailuresRetainEventId() {
+        for (tool in listOf("update_calendar_event", "delete_calendar_event")) {
+            val provider = FakeProvider()
+            PhoneOperations.execute(context, "create_calendar_event", event(), access = provider)
+            provider.failReadAfterMutation = true
+            provider.hasMutated = false
+            val result = PhoneOperations.execute(context, tool, JSONObject().put("event_id", "1").put("title", "Changed"), access = provider)
+            assertEquals(result.toString(), "OPERATION_UNCONFIRMED", result.getString("code"))
+            assertEquals("1", result.getString("event_id"))
+            assertEquals("unconfirmed", result.getString("status"))
+        }
+    }
+
+    private fun prepare(provider: FakeProvider, tool: String, args: JSONObject) = PhoneOperations.execute(
+        context, "prepare_calendar_write", JSONObject().put("write_tool", tool).put("arguments", args), access = provider,
+    )
+
     private fun event() =
         JSONObject()
             .put("title", "会议")
@@ -236,6 +347,9 @@ class NativeAppOperationsTest {
         var batches = 0
         var lastBatchSize = 0
         var failBatch = false
+        var failReadAfterMutation = false
+        var hasMutated = false
+        var accountName = "original-account"
         val events = mutableMapOf<Long, ContentValues>()
         val reminders = mutableListOf<ContentValues>()
         var lastInsert: ContentValues? = null
@@ -256,6 +370,9 @@ class NativeAppOperationsTest {
             args: Array<String>?,
             sort: String?,
         ): Cursor? {
+            if (failReadAfterMutation && hasMutated && uri.pathSegments.firstOrNull() in setOf("events", "reminders")) {
+                throw IllegalStateException("readback unavailable")
+            }
             if (uri.authority.orEmpty().endsWith("com.nearme.note") && !notesReady) return null
             val rows: List<Map<String, Any?>> =
                 when (uri.pathSegments.firstOrNull()) {
@@ -266,6 +383,7 @@ class NativeAppOperationsTest {
                                 "calendar_displayName" to "日历$it",
                                 "calendar_access_level" to 700,
                                 "visible" to 1,
+                                "account_name" to accountName,
                             )
                         }
                     "events" ->
@@ -310,6 +428,10 @@ class NativeAppOperationsTest {
 
         override fun delete(uri: Uri, selection: String?, args: Array<String>?): Int {
             deletedUri = uri
+            if (uri.pathSegments.firstOrNull() == "events") {
+                hasMutated = true
+                return if (events.remove(uri.lastPathSegment!!.toLong()) != null) 1 else 0
+            }
             return 0
         }
 
@@ -376,12 +498,17 @@ class NativeAppOperationsTest {
                         values: ContentValues?,
                         selection: String?,
                         selectionArgs: Array<out String>?,
-                    ): Int = 0
+                    ): Int {
+                        val existing = events[uri.lastPathSegment!!.toLong()] ?: return 0
+                        existing.putAll(values!!)
+                        return 1
+                    }
                 }
             val results = arrayOfNulls<ContentProviderResult>(operations.size)
             operations.forEachIndexed { index, operation ->
                 results[index] = operation.apply(provider, results, index)
             }
+            hasMutated = true
             @Suppress("UNCHECKED_CAST")
             return results as Array<ContentProviderResult>
         }

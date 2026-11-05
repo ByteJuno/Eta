@@ -98,7 +98,7 @@ class EtaDatabaseMigrationTest {
         val database = Room.databaseBuilder(context, EtaDatabase::class.java, name)
             .addMigrations(EtaDatabase.MIGRATION_22_23, EtaDatabase.MIGRATION_23_24,
                 EtaDatabase.MIGRATION_24_25, EtaDatabase.MIGRATION_25_26, EtaDatabase.MIGRATION_26_27,
-                EtaDatabase.MIGRATION_27_28, EtaDatabase.MIGRATION_28_29).build()
+                EtaDatabase.MIGRATION_27_28, EtaDatabase.MIGRATION_28_29, EtaDatabase.MIGRATION_29_30).build()
         try {
             runBlocking(Dispatchers.IO) {
                 val conversation = database.conversationDao().conversations().first { it.id == "conv-1" }
@@ -123,7 +123,7 @@ class EtaDatabaseMigrationTest {
     }
 
     @Test
-    fun migration6To29PreservesDataAndMovesCompleteConversationContext() {
+    fun migration6To30PreservesDataAndMovesCompleteConversationContext() {
         val context = RuntimeEnvironment.getApplication() as Context
         val databaseName = "migration-${UUID.randomUUID()}.db"
         createVersion6Database(context, databaseName)
@@ -135,7 +135,7 @@ class EtaDatabaseMigrationTest {
                     "authorization_type, tools_json, enabled_tool_names_json, created_at, " +
                     "sort_order, last_refreshed_at, last_protocol_version) VALUES " +
                     "('mcp-1', 'MCP', 'http://127.0.0.1:8787/mcp', 1, 'auto', 'none', " +
-                    "'[]', '[]', 1, 0, 2, '2026-07-28')"
+                    "'[{\"name\":\"read\",\"inputSchemaJson\":\"{}\"}]', '[\"read\"]', 1, 0, 2, '2026-07-28')"
             )
         }
 
@@ -164,6 +164,7 @@ class EtaDatabaseMigrationTest {
                 EtaDatabase.MIGRATION_26_27,
                 EtaDatabase.MIGRATION_27_28,
                 EtaDatabase.MIGRATION_28_29,
+                EtaDatabase.MIGRATION_29_30,
             )
             .build()
         try {
@@ -238,6 +239,11 @@ class EtaDatabaseMigrationTest {
             assertEquals(emptyList<RuntimeInFlightRunWithEvents>(), inFlightRuns)
             assertEquals(listOf("mcp-1"), mcpServers.map { it.id })
             assertEquals(null, mcpServers.single().toolsExpireAt)
+            assertEquals(setOf("read"), mcpServers.single().toDomain().enabledToolNames)
+            assertEquals(listOf("read"), mcpServers.single().toDomain().tools.map { it.name })
+            assertEquals(0L, mcpServers.single().revision)
+            assertEquals(0L, mcpServers.single().stateVersion)
+            assertEquals(false, mcpServers.single().credentialUpdatePending)
             assertEquals(null, provider.models.first().contextWindowOverride)
             assertEquals(null, provider.models.first().reasoningOverride)
             assertEquals(null, provider.models.first().reasoningCapabilitiesOverride)

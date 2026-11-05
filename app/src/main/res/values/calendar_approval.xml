@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="calendar_approval_title">Confirm calendar change</string>
+    <string name="calendar_approval_scope">Approve only this exact operation. Review the calendar/event target, time, time zone, reminders, and changed fields below. Leaving this conversation or the foreground cancels pending approval. Cancel cannot undo an operation that has already started.</string>
+    <string name="calendar_approval_tool">Operation: %1$s</string>
+    <string name="calendar_approval_identity">Connection: %1$s\nOperation ID: %2$s</string>
+    <string name="calendar_approval_target">Existing target (before this change)</string>
+    <string name="calendar_approval_fields">Exact fields to execute (calendar_id / event_id, start_time / end_time, timezone, reminder_minutes, and other fields; batch events are listed individually)</string>
+    <string name="calendar_approval_expiry">Approval expires: %1$s</string>
+    <string name="calendar_approval_confirm">Approve this operation</string>
+    <string name="calendar_approval_deny">Do not execute</string>
+</resources>

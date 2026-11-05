@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="calendar_unknown_title">Unconfirmed calendar operations</string>
+    <string name="calendar_unknown_summary">Inspect UNKNOWN records without replaying operations.</string>
+    <string name="calendar_unknown_notice">Up to 100 UNKNOWN records, oldest first. Effects may already exist. Check the calendar before doing anything else; this view does not retry, confirm success or roll back changes.</string>
+    <string name="calendar_unknown_empty">No UNKNOWN records found in the local ledger. This is not proof that every calendar change succeeded.</string>
+    <string name="calendar_unknown_record">UNKNOWN\nOperation: %1$s\nRun: %2$s\nTool: %3$s\nConnection: %4$s</string>
+    <string name="extension_history_loading">Reading local records…</string>
+    <string name="extension_history_failed">Could not read local records. No operation was retried.</string>
+    <string name="plugin_calls_title">Recent extension calls</string>
+    <string name="plugin_calls_summary">Local metadata: connection, tool, status and elapsed time.</string>
+    <string name="plugin_calls_notice">Up to 100 recent calls, newest first. ADMITTED is in progress; UNKNOWN needs checking and must not be automatically replayed. Status is host evidence, not a guarantee of remote rollback. Reading this list makes no network calls.</string>
+    <string name="plugin_calls_empty">No local call records.</string>
+    <string name="plugin_calls_record">Status: %1$s\nConnection: %2$s\nTool: %3$s\nRun: %4$s\nCall: %5$s\nRevision: %6$s\nStarted: %7$s\nElapsed: %8$s ms</string>
+</resources>

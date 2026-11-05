@@ -11,8 +11,17 @@ internal class PhoneAppTools(
     private val rootAvailable: () -> Boolean,
     private val colorOs: () -> Boolean,
 ) {
+    /** Host-only preparation; not a discoverable/model-callable tool. */
+    fun prepareCalendarWrite(tool: String, arguments: JSONObject): JSONObject =
+        executeInternal("prepare_calendar_write", JSONObject().put("write_tool", tool).put("arguments", arguments))
+            ?: PhoneOperation.failure("UNKNOWN_TOOL", "未知日历操作")
+
     fun execute(tool: String, arguments: JSONObject): JSONObject? {
         if (tool !in PhoneOperation.tools) return null
+        return executeInternal(tool, arguments)
+    }
+
+    private fun executeInternal(tool: String, arguments: JSONObject): JSONObject? {
         val calendar = tool.contains("calendar")
         val system =
             tool in NativePersonalQueries.sources.keys ||

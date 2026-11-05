@@ -16,7 +16,15 @@ internal object SubagentSessionStore {
         val profile: SubagentProfile,
         @Volatile var history: List<AgentModelClient.ConversationMessage> = emptyList(),
         val running: AtomicBoolean = AtomicBoolean(false),
-    )
+        // Host-generated SHA-256 of connection/revision/tool/name bindings; never credentials.
+        val toolBindingFingerprint: String? = null,
+    ) {
+        fun matchesToolBinding(fingerprint: String?, hasRemoteTools: Boolean): Boolean {
+            val stored = toolBindingFingerprint?.takeIf { it.isNotBlank() }
+            val current = fingerprint?.takeIf { it.isNotBlank() }
+            return stored == current && (stored != null || !hasRemoteTools)
+        }
+    }
 
     private class ConversationBucket {
         val sequence = AtomicInteger(0)
@@ -33,10 +41,19 @@ internal object SubagentSessionStore {
         ): Boolean = size > MAX_CONVERSATIONS
     }
 
-    fun create(conversationKey: String, profile: SubagentProfile): Entry = synchronized(lock) {
+    fun create(
+        conversationKey: String,
+        profile: SubagentProfile,
+        toolBindingFingerprint: String? = null,
+    ): Entry = synchronized(lock) {
         val bucket = buckets.getOrPut(conversationKey) { ConversationBucket() }
         val id = "sub_${bucket.sequence.incrementAndGet()}"
-        val entry = Entry(subagentId = id, profile = profile, running = AtomicBoolean(true))
+        val entry = Entry(
+            subagentId = id,
+            profile = profile,
+            running = AtomicBoolean(true),
+            toolBindingFingerprint = toolBindingFingerprint,
+        )
         bucket.entries[id] = entry
         entry
     }

@@ -104,8 +104,7 @@ internal fun AgentAppShell(
     onConversationRename: (ConversationSummaryUi) -> Unit,
     onConversationExport: (ConversationSummaryUi) -> Unit,
     onConversationDelete: (ConversationSummaryUi) -> Unit,
-    onOpenTools: () -> Unit,
-    onOpenSkills: () -> Unit,
+    onOpenExtensions: () -> Unit,
     onOpenCharacters: () -> Unit,
     onOpenPermissions: () -> Unit,
     onOpenSettings: () -> Unit,
@@ -185,8 +184,7 @@ internal fun AgentAppShell(
                 onOpenRootSettings = onOpenRootSettings,
                 onOpenAccessibilitySettings = onOpenAccessibilitySettings,
                 onOpenModelProviders = onOpenModelProviders,
-                onOpenTools = onOpenTools,
-                onOpenSkills = onOpenSkills,
+                onOpenExtensions = onOpenExtensions,
                 onOpenCharacters = onOpenCharacters,
                 onOpenPermissions = onOpenPermissions,
                 onOpenTasks = onOpenTasks,
@@ -439,6 +437,7 @@ private fun titleForRoute(route: AppRoute?): String = when (route) {
     is AppRoute.Home -> ""
     is AppRoute.Browser -> stringResource(R.string.route_browser)
     is AppRoute.Terminal -> stringResource(R.string.route_terminal)
+    is AppRoute.Extensions -> stringResource(R.string.route_extensions)
     is AppRoute.Tools -> stringResource(R.string.route_tools)
     is AppRoute.WebToolsSettings -> stringResource(R.string.web_tools_settings_title)
     is AppRoute.Skills -> stringResource(R.string.route_skills)

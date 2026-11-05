@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="route_extensions">Extensions</string>
+    <string name="extensions_summary">Built-in capabilities, connected services, and skills</string>
+    <string name="extensions_builtin">Built-in capabilities</string>
+    <string name="extensions_builtin_summary">Explore phone tools and their system permission requirements.</string>
+    <string name="extensions_services">Connected services</string>
+    <string name="extensions_services_summary">Add remote MCP connections, discover tools, and grant access per tool.</string>
+    <string name="extensions_skills">Skills</string>
+    <string name="extensions_skills_summary">Manage instructions and resources. Skills cannot grant tool access or enable connections.</string>
+    <string name="extensions_scope">These categories keep their own settings. Remote tools run on the connected service; skills describe how to use tools, not a code sandbox.</string>
+    <string name="mcp_authorization_policy">Grant access to individual tools in this connection. Authorized tools run automatically within task and entry-point constraints, without a prompt for each write; unauthorized tools do not run. New tools require authorization. If definition changes revoke a grant, review and authorize it again. Disabling closes direct tool access; it does not undo existing effects or block access through other general tools. Already started remote actions may still finish.</string>
+    <string name="mcp_remote_data_notice">Task arguments are sent to this remote service. Use a distinct name for each account connection. Connecting and discovering tools does not authorize them.</string>
+    <string name="mcp_connection_status">MCP · %1$s</string>
+    <string name="mcp_connection_enabled">Enabled (not a live status)</string>
+    <string name="mcp_connection_disabled">Disabled</string>
+    <string name="mcp_connection_needs_grant">No authorized tools</string>
+    <string name="mcp_credentials_pending">Credential update incomplete; calls blocked. Save authentication again.</string>
+    <string name="mcp_granted_count">%1$d authorized / %2$d cached tools</string>
+    <string name="mcp_last_checked">Last successful tool check: %1$s (cached, not live)</string>
+    <string name="mcp_never_checked">No successful tool check recorded; current connection status unknown</string>
+    <string name="mcp_change_failed">Could not save this change. The connection may have changed; refresh and review its current settings before trying again.</string>
+    <string name="mcp_grant_stale">The connection changed while this dialog was open. Close it and review the latest tool definition before authorizing.</string>
+    <string name="mcp_tool_schema">Input schema supplied by the service:\n%1$s</string>
+</resources>

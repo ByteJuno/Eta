@@ -6,6 +6,8 @@ import android.content.ContentValues
 import android.content.Context
 import android.net.Uri
 import android.provider.CalendarContract
+import java.security.MessageDigest
+import java.time.Instant
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -38,8 +40,22 @@ internal class CalendarOperations(
             "deleted",
         )
 
-    fun execute(tool: String, args: JSONObject): JSONObject =
-        when (tool) {
+    fun execute(tool: String, args: JSONObject): JSONObject {
+        if (tool == "prepare_calendar_write") {
+            return prepare(
+                PhoneOperation.text(args, "write_tool", true, 80)!!,
+                args.optJSONObject("arguments") ?: PhoneOperation.error("INVALID_ARGUMENT", "arguments 必须是对象"),
+            )
+        }
+        val effectiveArgs = if (tool in WRITE_TOOLS && args.has("expected_target_digest")) {
+            val expected = PhoneOperation.text(args, "expected_target_digest", true, 64)
+            val prepared = prepare(tool, args)
+            if (prepared.getString("target_digest") != expected) {
+                return PhoneOperation.failure("APPROVAL_TARGET_CHANGED", "日历目标已变化，请重新确认")
+            }
+            prepared.getJSONObject("normalized_arguments")
+        } else args
+        return when (tool) {
             "list_calendars" -> {
                 PhoneOperation.ok(tool).put("items", JSONArray(calendars()))
             }
@@ -49,17 +65,104 @@ internal class CalendarOperations(
                 } ?: missing()
             }
             "search_calendar_events" -> search(args)
-            "create_calendar_event" -> create(args)
-            "create_calendar_events" -> createMany(args)
-            "update_calendar_event" -> update(args)
-            "delete_calendar_event" -> delete(args)
+            "create_calendar_event" -> create(effectiveArgs)
+            "create_calendar_events" -> createMany(effectiveArgs)
+            "update_calendar_event" -> update(effectiveArgs)
+            "delete_calendar_event" -> delete(effectiveArgs)
             else -> PhoneOperation.failure("UNKNOWN_TOOL", "未知日历操作")
         }
+    }
+
+    /** Read-only host preparation. A digest constrains execution; it is never an approval token. */
+    private fun prepare(tool: String, args: JSONObject): JSONObject {
+        if (tool !in WRITE_TOOLS) PhoneOperation.error("INVALID_ARGUMENT", "不支持此日历写操作")
+        val targets = JSONArray()
+        val normalized = when (tool) {
+            "create_calendar_event" -> normalizeCreate(args, targets)
+            "create_calendar_events" -> JSONObject().put("events", JSONArray(
+                batchRequests(args).map { normalizeCreate(it, targets) },
+            ))
+            else -> {
+                val id = PhoneOperation.id(args, "event_id")
+                val before = read(id) ?: PhoneOperation.error("CALENDAR_EVENT_NOT_FOUND", "未找到当前用户的有效日历事件")
+                val calendarId = before.getString("calendar_id")
+                val target = calendarTarget(calendarId)
+                    .put("event_id", id.toString())
+                    .put("timezone", before.optString("eventTimezone"))
+                    .put("event", before)
+                targets.put(target)
+                if (tool == "update_calendar_event") {
+                    validateUpdate(before)
+                    val values = eventValues(args, false)
+                    val reminder = reminders(args)
+                    if (values.size() == 0 && reminder == null) PhoneOperation.error("INVALID_ARGUMENT", "没有需要修改的字段")
+                    normalizedValues(values, reminder).put("event_id", id.toString())
+                        .put("calendar_id", calendarId).also { normalized ->
+                            // Pin the existing temporal fields too: device timezone changes cannot alter them.
+                            if (!values.containsKey("dtstart")) {
+                                normalized.put("start_time", Instant.ofEpochMilli(before.getString("dtstart").toLong()).toString())
+                                normalized.put("end_time", Instant.ofEpochMilli(before.getString("dtend").toLong()).toString())
+                                normalized.put("all_day", before.optString("allDay") == "1")
+                                normalized.put("timezone", before.optString("eventTimezone").ifBlank { "UTC" })
+                            }
+                            eventValues(normalized, false) // Validate the pinned temporal values before approval.
+                        }
+                } else {
+                    JSONObject().put("event_id", id.toString()).put("calendar_id", calendarId)
+                        .put("scope", deleteScope(args, before))
+                        .put("timezone", before.optString("eventTimezone"))
+                        .put("start_time", before.optString("dtstart").toLongOrNull()?.let { Instant.ofEpochMilli(it).toString() } ?: JSONObject.NULL)
+                        .put("end_time", before.optString("dtend").toLongOrNull()?.let { Instant.ofEpochMilli(it).toString() } ?: JSONObject.NULL)
+                }
+            }
+        }
+        val summary = JSONObject().put("write_tool", tool).put("user_id", userId ?: context.applicationInfo.uid / 100000)
+            .put("arguments", normalized).put("targets", targets)
+        val digest = MessageDigest.getInstance("SHA-256").digest(canonical(summary).toByteArray(Charsets.UTF_8))
+            .joinToString("") { "%02x".format(it.toInt() and 0xff) }
+        return PhoneOperation.ok("prepare_calendar_write").put("write_tool", tool)
+            .put("normalized_arguments", normalized).put("target_digest", digest).put("targets", targets)
+    }
+
+    private fun normalizeCreate(args: JSONObject, targets: JSONArray): JSONObject {
+        val values = eventValues(args, true)
+        val target = calendarTarget(values.getAsString("calendar_id"))
+            .put("timezone", values.getAsString("eventTimezone"))
+        targets.put(target)
+        return normalizedValues(values, reminders(args))
+    }
+
+    private fun normalizedValues(values: ContentValues, reminders: List<Int>?): JSONObject = JSONObject().also { result ->
+        mapOf("calendar_id" to "calendar_id", "title" to "title", "description" to "description", "eventLocation" to "location").forEach { (column, key) ->
+            if (values.containsKey(column)) result.put(key, values.getAsString(column))
+        }
+        if (values.containsKey("dtstart")) {
+            result.put("start_time", Instant.ofEpochMilli(values.getAsLong("dtstart")).toString())
+                .put("end_time", Instant.ofEpochMilli(values.getAsLong("dtend")).toString())
+                .put("timezone", values.getAsString("eventTimezone"))
+                .put("all_day", values.getAsInteger("allDay") == 1)
+        }
+        reminders?.let { result.put("reminder_minutes", JSONArray(it.sorted())) }
+    }
+
+    private fun calendarTarget(id: String): JSONObject {
+        val calendar = calendars().singleOrNull { it.getString("_id") == id }
+            ?: PhoneOperation.error("CALENDAR_NOT_WRITABLE", "指定日历不存在或不可写")
+        return JSONObject().put("calendar_id", id).put("calendar", calendar)
+    }
+
+    private fun canonical(value: Any?): String = when (value) {
+        is JSONObject -> value.keys().asSequence().toList().sorted().joinToString(",", "{", "}") { JSONObject.quote(it) + ":" + canonical(value.opt(it)) }
+        is JSONArray -> (0 until value.length()).joinToString(",", "[", "]") { canonical(value.opt(it)) }
+        null, JSONObject.NULL -> "null"
+        is String -> JSONObject.quote(value)
+        else -> value.toString()
+    }
 
     private fun calendars(): List<JSONObject> =
         rows(
                 uri("calendars"),
-                arrayOf("_id", "calendar_displayName", "calendar_access_level", "visible"),
+                arrayOf("_id", "calendar_displayName", "calendar_access_level", "visible", "account_name", "account_type", "ownerAccount", "calendar_timezone"),
                 "calendar_access_level >= ?",
                 arrayOf(CalendarContract.Calendars.CAL_ACCESS_CONTRIBUTOR.toString()),
                 "_id ASC",
@@ -133,11 +236,13 @@ internal class CalendarOperations(
 
     private fun create(args: JSONObject): JSONObject {
         val result = createBatch(listOf(args), "create_calendar_event")
-        val item = result.getJSONArray("events").getJSONObject(0)
-        return result.put("event_id", item.getString("event_id")).put("event", item)
+        val item = result.getJSONArray("events").optJSONObject(0)
+        return result.also { if (item != null) it.put("event_id", item.getString("event_id")).put("event", item) }
     }
 
-    private fun createMany(args: JSONObject): JSONObject {
+    private fun createMany(args: JSONObject): JSONObject = createBatch(batchRequests(args), "create_calendar_events")
+
+    private fun batchRequests(args: JSONObject): List<JSONObject> {
         val events =
             args.optJSONArray("events") ?: PhoneOperation.error("INVALID_ARGUMENT", "events 必须是数组")
         if (events.length() !in 1..30) PhoneOperation.error("INVALID_ARGUMENT", "每批最多创建30个日程")
@@ -150,7 +255,7 @@ internal class CalendarOperations(
                     if (args.has("calendar_id")) it.put("calendar_id", args.get("calendar_id"))
                 }
             }
-        return createBatch(requests, "create_calendar_events")
+        return requests
     }
 
     private fun createBatch(requests: List<JSONObject>, tool: String): JSONObject {
@@ -175,15 +280,16 @@ internal class CalendarOperations(
         onMutation()
         val committed = resolver.applyBatch(uri("events").authority!!, operations)
         val events = JSONArray()
-        var verified = true
-        positions.forEachIndexed { index, position ->
-            val inserted =
-                committed.getOrNull(position)?.uri
-                    ?: PhoneOperation.error("OPERATION_UNCONFIRMED", "日历未返回创建的事件 ID")
-            val id = ContentUris.parseId(inserted)
-            val after = read(id)
+        // Capture ALL returned IDs before any fallible Provider readback.
+        val ids = positions.map { position ->
+            committed.getOrNull(position)?.uri?.let { runCatching { ContentUris.parseId(it) }.getOrNull() }?.takeIf { it > 0 }
+        }
+        var verified = ids.all { it != null }
+        ids.forEachIndexed { index, id ->
+            if (id == null) return@forEachIndexed
+            val after = try { read(id) } catch (_: Exception) { null }
             val (values, reminders) = plans[index]
-            val matches = matches(after, values) && reminderMatches(after, reminders)
+            val matches = runCatching { matches(after, values) && reminderMatches(after, reminders) }.getOrDefault(false)
             verified = verified && matches
             events.put(
                 JSONObject()
@@ -196,14 +302,28 @@ internal class CalendarOperations(
         }
         return PhoneOperation.changed(tool, verified)
             .put("events", events)
+            .put("event_ids", JSONArray(ids.filterNotNull().map { it.toString() }))
             .put("count", events.length())
+            .put("requested_count", requests.size)
+    }
+
+    private fun validateUpdate(before: JSONObject) {
+        if (before.optString("rrule").isNotBlank() && !before.isNull("rrule"))
+            PhoneOperation.error("RECURRING_EVENT_SCOPE_REQUIRED", "重复日程需要明确实例或整组修改范围，当前接口不改写重复事件")
+    }
+
+    private fun deleteScope(args: JSONObject, before: JSONObject): String {
+        val scope = PhoneOperation.text(args, "scope", false, 20) ?: "event"
+        if (scope !in setOf("event", "series")) PhoneOperation.error("INVALID_ARGUMENT", "scope 必须是 event 或 series")
+        if (!before.isNull("rrule") && before.optString("rrule").isNotBlank() && scope != "series")
+            PhoneOperation.error("RECURRING_EVENT_SCOPE_REQUIRED", "删除重复日程需明确 scope=series")
+        return scope
     }
 
     private fun update(args: JSONObject): JSONObject {
         val id = PhoneOperation.id(args, "event_id")
         val before = read(id) ?: return missing()
-        if (before.optString("rrule").isNotBlank() && !before.isNull("rrule"))
-            PhoneOperation.error("RECURRING_EVENT_SCOPE_REQUIRED", "重复日程需要明确实例或整组修改范围，当前接口不改写重复事件")
+        validateUpdate(before)
         val values = eventValues(args, false)
         val reminders = reminders(args)
         if (values.size() == 0 && reminders == null)
@@ -231,10 +351,10 @@ internal class CalendarOperations(
         }
         onMutation()
         resolver.applyBatch(uri("events").authority!!, operations)
-        val after = read(id)
+        val after = try { read(id) } catch (_: Exception) { null }
         return PhoneOperation.changed(
                 "update_calendar_event",
-                matches(after, values) && reminderMatches(after, reminders),
+                runCatching { matches(after, values) && reminderMatches(after, reminders) }.getOrDefault(false),
             )
             .put("event_id", id.toString())
             .put("before", before)
@@ -244,14 +364,11 @@ internal class CalendarOperations(
     private fun delete(args: JSONObject): JSONObject {
         val id = PhoneOperation.id(args, "event_id")
         val before = read(id) ?: return missing()
-        val scope = PhoneOperation.text(args, "scope", false, 20) ?: "event"
-        if (scope !in setOf("event", "series"))
-            PhoneOperation.error("INVALID_ARGUMENT", "scope 必须是 event 或 series")
-        if (!before.isNull("rrule") && before.optString("rrule").isNotBlank() && scope != "series")
-            PhoneOperation.error("RECURRING_EVENT_SCOPE_REQUIRED", "删除重复日程需明确 scope=series")
+        deleteScope(args, before)
         onMutation()
         val affected = resolver.delete(ContentUris.withAppendedId(uri("events"), id), null, null)
-        return PhoneOperation.changed("delete_calendar_event", affected > 0 && read(id) == null)
+        val verified = try { affected > 0 && read(id) == null } catch (_: Exception) { false }
+        return PhoneOperation.changed("delete_calendar_event", verified)
             .put("event_id", id.toString())
             .put("affected", affected)
     }
@@ -401,5 +518,6 @@ internal class CalendarOperations(
 
     companion object {
         private const val DAY_MS = 86_400_000L
+        private val WRITE_TOOLS = setOf("create_calendar_event", "create_calendar_events", "update_calendar_event", "delete_calendar_event")
     }
 }
