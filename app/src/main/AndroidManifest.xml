@@ -133,6 +133,8 @@
             android:process=":recognition">
             <intent-filter>
                 <action android:name="android.speech.RecognitionService" />
+                <!-- SpeechRecognizer.isRecognitionAvailable() queries with MATCH_DEFAULT_ONLY (upstream #213). -->
+                <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
             <meta-data
                 android:name="android.speech"
