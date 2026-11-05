@@ -937,6 +937,22 @@
   <string name="provider_probe_unsupported">不支援</string>
   <string name="provider_probe_failed">請求失敗</string>
   <string name="provider_probe_skipped">未測試</string>
+  <string name="usage_stats_title">用量統計</string>
+  <string name="usage_stats_summary">本機記錄的模型 token 用量，按日期和模型彙總</string>
+  <string name="usage_stats_loading">讀取中…</string>
+  <string name="usage_stats_empty">還沒有記錄到模型請求。</string>
+  <string name="usage_stats_note">統計本機每次成功的模型請求（含上下文壓縮），保留 90 天。數字來自服務商回傳的用量，計費以服務商為準。</string>
+  <string name="usage_stats_clear">清空</string>
+  <string name="usage_stats_clear_confirm">再點一次清空</string>
+  <string name="action_close_usage_stats">關閉</string>
+  <string name="usage_stats_overview">概覽</string>
+  <string name="usage_stats_today">今天</string>
+  <string name="usage_stats_7_days">近 7 天</string>
+  <string name="usage_stats_30_days">近 30 天</string>
+  <string name="usage_stats_by_model">按模型（30 天）</string>
+  <string name="usage_stats_by_day">按日期</string>
+  <string name="usage_stats_cache_unknown">未上報</string>
+  <string name="usage_stats_line">%1$d 次 · 輸入 %2$s · 輸出 %3$s · 快取命中 %4$s</string>
   <plurals name="provider_models_added">
     <item quantity="other">已新增 %d 個模型</item>
   </plurals>

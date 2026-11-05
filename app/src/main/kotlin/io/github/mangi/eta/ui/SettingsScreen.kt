@@ -166,6 +166,7 @@ private fun SettingsPageContent(
     var hasConnectedFramework by remember { mutableStateOf(enhancementHistory.hasConnected) }
     var hasUsedSystemizer by remember { mutableStateOf(enhancementHistory.hasUsedSystemizer) }
     var showSystemizerDialog by remember { mutableStateOf(false) }
+    var showUsageStats by remember { mutableStateOf(false) }
     var installingSystemizer by remember { mutableStateOf(false) }
 
     // 悬浮窗权限状态：授权后从系统设置返回时（ON_RESUME）刷新。
@@ -286,6 +287,17 @@ private fun SettingsPageContent(
                             )
                         },
                         onClick = { onNavigate(AppRoute.ModelProviders) },
+                    )
+                    ArrowPreference(
+                        title = stringResource(R.string.usage_stats_title),
+                        summary = stringResource(R.string.usage_stats_summary),
+                        startAction = {
+                            SettingsIcon(
+                                icon = Icons.Rounded.Dashboard,
+                                tint = SettingsIconColors.Blue,
+                            )
+                        },
+                        onClick = { showUsageStats = true },
                     )
                     SwitchPref(
                         context = context,
@@ -841,6 +853,10 @@ private fun SettingsPageContent(
                     )
                 }
             }
+        }
+
+        if (showUsageStats) {
+            io.github.mangi.eta.ui.components.UsageStatsDialog(onDismiss = { showUsageStats = false })
         }
 
         SystemizerConfirmDialog(
