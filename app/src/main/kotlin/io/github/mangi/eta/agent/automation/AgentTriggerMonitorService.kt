@@ -1,5 +1,6 @@
 package io.github.mangi.eta.agent.automation
 
+import android.Manifest
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -10,6 +11,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.net.ConnectivityManager
 import android.net.Network
@@ -58,7 +60,11 @@ internal class AgentTriggerMonitorService : Service() {
         val type = if (intent.action == BluetoothDevice.ACTION_ACL_CONNECTED) "bluetooth_connected" else "bluetooth_disconnected"
         val device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE, BluetoothDevice::class.java)
         // 读取名称需要 BLUETOOTH_CONNECT；未授权时仍发布事件，只是不能按设备名过滤。
-        val name = runCatching { device?.name }.getOrNull()?.trim().orEmpty()
+        val name = if (context.checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED) {
+            try { device?.name } catch (_: SecurityException) { null }
+        } else {
+            null
+        }?.trim().orEmpty()
         val data = JSONObject().apply { if (name.isNotEmpty()) put("deviceName", name.take(100)) }
         AgentTaskScheduler.publish(context, type, System.currentTimeMillis().toString(), data)
     }
