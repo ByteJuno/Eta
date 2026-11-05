@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="run_result_channel">任務結果</string>
-    <string name="run_result_done">Eta 任務已完成</string>
-    <string name="run_result_failed">Eta 任務失敗</string>
-    <string name="run_result_stopped">Eta 任務已停止</string>
-    <string name="run_result_paused">Eta 任務已暫停，需要你處理</string>
-    <string name="run_result_open_hint">點擊在 Eta 中查看結果</string>
+    <string name="run_result_done">Theta 任務已完成</string>
+    <string name="run_result_failed">Theta 任務失敗</string>
+    <string name="run_result_stopped">Theta 任務已停止</string>
+    <string name="run_result_paused">Theta 任務已暫停，需要你處理</string>
+    <string name="run_result_open_hint">點擊在 Theta 中查看結果</string>
     <string name="run_result_quiet_channel">任務結果（已顯示結果卡片）</string>
 </resources>

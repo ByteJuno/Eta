@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="580" viewBox="0 0 1080 580">
+<defs>
+ <linearGradient id="a" x2="1" y2="1"><stop stop-color="#4268EC"/><stop offset="1" stop-color="#2038A4"/></linearGradient>
+ <linearGradient id="b" x2="1" y2="1"><stop stop-color="#E9EDF5"/><stop offset="1" stop-color="#CFD7E9"/></linearGradient>
+ <linearGradient id="c" x2="0" y2="1"><stop stop-color="#B95835"/><stop offset="1" stop-color="#863B25"/></linearGradient>
+ <symbol id="fold" viewBox="0 0 200 200">
+  <rect width="200" height="200" rx="46" fill="url(#a)"/>
+  <path d="M57 55 Q57 43 69 43 H145 Q157 43 157 55 V127 Q157 139 145 139 H69 Q57 139 57 127Z" fill="#A8C3FF" opacity=".5"/>
+  <path d="M43 73 Q43 61 55 61 H131 Q143 61 143 73 V145 Q143 157 131 157 H55 Q43 157 43 145Z" fill="#F4F7FF"/>
+  <path d="M62 104 H124 V114 H62Z" fill="#2A48BD"/>
+  <path d="M143 61 V91 L113 61Z" fill="#CEE0FF"/>
+ </symbol>
+ <symbol id="theta" viewBox="0 0 200 200">
+  <rect width="200" height="200" rx="46" fill="url(#b)"/>
+  <g transform="translate(100 100) rotate(24) translate(-100 -100)">
+   <path d="M100 39 C133 39 145 65 145 100 C145 135 133 161 100 161 C67 161 55 135 55 100 C55 65 67 39 100 39Z" fill="none" stroke="#253462" stroke-width="17"/>
+   <path d="M81 100 H119" stroke="#4268EC" stroke-width="16" stroke-linecap="round"/>
+  </g>
+ </symbol>
+ <symbol id="rooms" viewBox="0 0 200 200">
+  <rect width="200" height="200" rx="46" fill="url(#c)"/>
+  <path d="M68 39 H132 Q151 39 151 58 V142 Q151 161 132 161 H68 Q49 161 49 142 V58 Q49 39 68 39Z" fill="#FFEDE2"/>
+  <path d="M78 57 H122 Q132 57 132 67 V89 H68 V67 Q68 57 78 57Z M68 111 H132 V133 Q132 143 122 143 H78 Q68 143 68 133Z" fill="#9E482D"/>
+ </symbol>
+</defs>
+<rect width="1080" height="580" fill="#F4F6FA"/>
+<g font-family="Segoe UI,Microsoft YaHei,sans-serif" fill="#24304B">
+ <text x="60" y="58" font-size="30" font-weight="600">Theta / 图标方向</text>
+ <text x="60" y="90" font-size="16" fill="#626D83">让符号对应行动与双屏，而不只是把字母放在色块上。</text>
+ <use href="#fold" x="90" y="136" width="200" height="200"/>
+ <use href="#theta" x="440" y="136" width="200" height="200"/>
+ <use href="#rooms" x="790" y="136" width="200" height="200"/>
+ <text x="190" y="380" text-anchor="middle" font-size="23" font-weight="600">A · 折叠双屏</text>
+ <text x="540" y="380" text-anchor="middle" font-size="23" font-weight="600">B · 倾斜 θ</text>
+ <text x="890" y="380" text-anchor="middle" font-size="23" font-weight="600">C · 负形双舱</text>
+ <text x="190" y="411" text-anchor="middle" font-size="15" fill="#626D83">前台与你同在，后台替你行动</text>
+ <text x="540" y="411" text-anchor="middle" font-size="15" fill="#626D83">保留字母血统，增加方向与动势</text>
+ <text x="890" y="411" text-anchor="middle" font-size="15" fill="#626D83">用两块屏幕的留白构成 θ</text>
+ <use href="#fold" x="130" y="449" width="48" height="48"/><use href="#fold" x="211" y="457" width="32" height="32"/>
+ <use href="#theta" x="480" y="449" width="48" height="48"/><use href="#theta" x="561" y="457" width="32" height="32"/>
+ <use href="#rooms" x="830" y="449" width="48" height="48"/><use href="#rooms" x="911" y="457" width="32" height="32"/>
+ <text x="60" y="547" font-size="14" fill="#626D83">概念预览 · 下方为 48 / 32 像素 · 选定后再统一替换 Android 图标</text>
+</g></svg>

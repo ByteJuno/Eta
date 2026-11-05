@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="run_result_channel">Task results</string>
-    <string name="run_result_done">Eta task finished</string>
-    <string name="run_result_failed">Eta task failed</string>
-    <string name="run_result_stopped">Eta task stopped</string>
-    <string name="run_result_paused">Eta task paused, needs you</string>
-    <string name="run_result_open_hint">Tap to view the result in Eta</string>
+    <string name="run_result_done">Theta task finished</string>
+    <string name="run_result_failed">Theta task failed</string>
+    <string name="run_result_stopped">Theta task stopped</string>
+    <string name="run_result_paused">Theta task paused, needs you</string>
+    <string name="run_result_open_hint">Tap to view the result in Theta</string>
     <string name="run_result_quiet_channel">Task results (card already shown)</string>
 </resources>

@@ -4,7 +4,7 @@
 
 Eta is a single-module Android assistant built with Kotlin and Jetpack Compose.
 
-- `app/src/main/kotlin/io/github/mangi/eta/`: `agent/` contains runtime and tools, `ui/` Compose screens, `data/` persistence, and `hook/` OEM/Xposed integrations.
+- `app/src/main/kotlin/io/github/bytejuno/theta/`: `agent/` contains runtime and tools, `ui/` Compose screens, `data/` persistence, and `hook/` OEM/Xposed integrations.
 - `app/src/test/kotlin/`: JVM tests mirroring production packages.
 - `app/src/main/res/` and `app/src/main/assets/`: localized resources, bundled skills, catalogs, and licenses.
 - `app/src/main/cpp/` and `app/src/main/jniLibs/`: terminal helper source and packaged native binaries.

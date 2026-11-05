@@ -175,7 +175,7 @@ Root 探测在 IO 线程执行：存在 `su` 时首次自动请求一次，最�
 | 单文档正文 | 最多保留 200000 字符，超过则标记 `content_limit`。 |
 | 单页正文 | 默认 12000、最多 16000 字符；链接与标题另有独立数量、文本预算和截断标记。 |
 
-`WebHttpTransport` 只接受 HTTP(S)，拒绝带用户名或密码的 URL，并去掉片段部分。每一跳均检查协议、URL 凭据和重定向预算；允许访问当前网络可达的地址，不额外拦截 DNS、IP、局域网或本机地址，因此不能描述为网络安全沙箱。请求仍受系统网络授权和连接条件约束。取消或关闭运行会取消当前拥有的 HTTP 请求，正文提取和缓存读取也检查取消状态。参数、状态码及预算的事实源为 [AgentWebToolCatalog](../app/src/main/kotlin/io/github/mangi/eta/agent/model/AgentWebToolCatalog.kt)、[WebHttpTransport](../app/src/main/kotlin/io/github/mangi/eta/agent/web/WebHttpTransport.kt) 与 [WebPageContent](../app/src/main/kotlin/io/github/mangi/eta/agent/web/WebPageContent.kt)。
+`WebHttpTransport` 只接受 HTTP(S)，拒绝带用户名或密码的 URL，并去掉片段部分。每一跳均检查协议、URL 凭据和重定向预算；允许访问当前网络可达的地址，不额外拦截 DNS、IP、局域网或本机地址，因此不能描述为网络安全沙箱。请求仍受系统网络授权和连接条件约束。取消或关闭运行会取消当前拥有的 HTTP 请求，正文提取和缓存读取也检查取消状态。参数、状态码及预算的事实源为 [AgentWebToolCatalog](../app/src/main/kotlin/io/github/bytejuno/theta/agent/model/AgentWebToolCatalog.kt)、[WebHttpTransport](../app/src/main/kotlin/io/github/bytejuno/theta/agent/web/WebHttpTransport.kt) 与 [WebPageContent](../app/src/main/kotlin/io/github/bytejuno/theta/agent/web/WebPageContent.kt)。
 
 搜索摘要、网页正文和链接均标记为不可信外部数据，不能修改工具权限或覆盖 Runtime 指令。回答引用搜索结果时使用标题与返回的原始目标 URL；引用已读取页面时使用标题与 `final_url`，不能把内部文档 ID 当作来源，也不能把搜索摘要冒充完整阅读证据。运行摘要仅显示动作、主机与计数，不回显查询词、完整 URL、正文或服务端错误原文；原始工具交换仍按普通工具结果进入模型上下文与会话记录。
 
@@ -208,7 +208,7 @@ Shell 子进程在校验失败或取消时可能提前关闭输入管道，执�
 
 目录续页使用 `next_offset` 和 `expected_revision`；偏移指向原始目录枚举位置，隐藏项过滤可能使一页返回较少条目，不能据此认定结束。`has_more=false` 才表示列举完成。目录变化使游标失效。整份目录分页 JSON 最多 16000 字符，达到输出预算时停在尚未返回的条目前并保留续页位置；`stop_reason` 区分 `eof`、`entry_limit` 和 `output_limit`。底层目录枚举、单条路径或元数据超限则返回明确失败。
 
-递归搜索默认跳过隐藏目录，不追踪符号链接；条目数、读取字节数、结果数量、输出文本及递归深度分别有预算。搜索另有约 5 秒的软时间预算，检查点达到预算时以 `time_limit` 返回已取得结果和续查游标；单次阻塞操作仍由整次 20 秒上限终止，硬超时、取消或执行进程失败不会伪装成普通文件跳过。继续搜索时原样传回 `next_cursor` 并保持查询条件、环境、身份不变。`partial`、`complete`、`stop_reason` 和跳过项共同说明覆盖范围；达到本轮扫描或结果预算并返回有效游标时可以续查，跳过二进制、不可访问项或过深目录等则保留不完整标记，空匹配不代表所有文件均不存在该内容。完整参数及限制以 [AgentFileToolCatalog](../app/src/main/kotlin/io/github/mangi/eta/agent/model/AgentFileToolCatalog.kt) 与对应后端实现为准。
+递归搜索默认跳过隐藏目录，不追踪符号链接；条目数、读取字节数、结果数量、输出文本及递归深度分别有预算。搜索另有约 5 秒的软时间预算，检查点达到预算时以 `time_limit` 返回已取得结果和续查游标；单次阻塞操作仍由整次 20 秒上限终止，硬超时、取消或执行进程失败不会伪装成普通文件跳过。继续搜索时原样传回 `next_cursor` 并保持查询条件、环境、身份不变。`partial`、`complete`、`stop_reason` 和跳过项共同说明覆盖范围；达到本轮扫描或结果预算并返回有效游标时可以续查，跳过二进制、不可访问项或过深目录等则保留不完整标记，空匹配不代表所有文件均不存在该内容。完整参数及限制以 [AgentFileToolCatalog](../app/src/main/kotlin/io/github/bytejuno/theta/agent/model/AgentFileToolCatalog.kt) 与对应后端实现为准。
 
 这些工具只接受文件系统路径，不直接接受或写回 `content://` 等文档 URI。选择器导入返回的是工作区副本，编辑副本不代表修改来源文档；App 文件页面的导入、导出与模型文件工具是不同入口。当前没有专用的文件复制、移动或文档导出工具。
 
@@ -228,7 +228,7 @@ Shell 子进程在校验失败或取消时可能提前关闭输入管道，执�
 
 ### 个人上下文
 
-模型目录使用 `search_notes`、`search_system_memories`、`search_bills`、`search_flights` 等明确入口，不公开 `personal_context(action, source)` 万能工具。旧 `search_coloros_notes`、`search_coloros_memories` 名称只在执行层兼容，不重复出现在模型目录中。合同分别见 [AgentPersonalSearchToolCatalog](../app/src/main/kotlin/io/github/mangi/eta/agent/model/AgentPersonalSearchToolCatalog.kt) 和 [AgentDeviceToolCatalog](../app/src/main/kotlin/io/github/mangi/eta/agent/model/AgentDeviceToolCatalog.kt)。
+模型目录使用 `search_notes`、`search_system_memories`、`search_bills`、`search_flights` 等明确入口，不公开 `personal_context(action, source)` 万能工具。旧 `search_coloros_notes`、`search_coloros_memories` 名称只在执行层兼容，不重复出现在模型目录中。合同分别见 [AgentPersonalSearchToolCatalog](../app/src/main/kotlin/io/github/bytejuno/theta/agent/model/AgentPersonalSearchToolCatalog.kt) 和 [AgentDeviceToolCatalog](../app/src/main/kotlin/io/github/bytejuno/theta/agent/model/AgentDeviceToolCatalog.kt)。
 
 - 媒体、文件、联系人、短信、通话、录音和便签等原始来源使用类型化 Provider 查询；日程读取使用 Calendar Provider。固定 URI、字段与参数由执行器管理，不向模型开放 SQL 或任意 Provider。
 - `search_media`、`search_files` 默认按原始来源检索名称，`match=content` 查询 ColorOS 内容索引。`search_notes` 优先读取原始便签；来源不可用时可返回明确标记的历史索引，`current_only=true` 禁止这种回退。空游标接口与零条记录分别处理。
@@ -243,7 +243,7 @@ Shell 子进程在校验失败或取消时可能提前关闭输入管道，执�
 
 ### 一方应用操作
 
-[AgentPhoneToolCatalog](../app/src/main/kotlin/io/github/mangi/eta/agent/model/AgentPhoneToolCatalog.kt) 集中声明新增入口及其权限元数据。`agent/phone/` 按日历、时钟、便签和系统操作划分执行器；Root 通道以标准输入传输类型化请求，通过 `app_process` 调用 Eta 的固定入口，参数不拼入 Shell 命令。Root 身份使用真实调用归属，不冒充系统助手包名。
+[AgentPhoneToolCatalog](../app/src/main/kotlin/io/github/bytejuno/theta/agent/model/AgentPhoneToolCatalog.kt) 集中声明新增入口及其权限元数据。`agent/phone/` 按日历、时钟、便签和系统操作划分执行器；Root 通道以标准输入传输类型化请求，通过 `app_process` 调用 Eta 的固定入口，参数不拼入 Shell 命令。Root 身份使用真实调用归属，不冒充系统助手包名。
 
 | 领域 | 能力与边界 |
 | --- | --- |

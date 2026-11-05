@@ -1,0 +1,162 @@
+package io.github.bytejuno.theta
+
+import io.github.bytejuno.theta.agent.voice.SpeechOssUpload
+import android.app.Application
+import android.content.ComponentCallbacks2
+import android.os.Handler
+import android.os.Looper
+import io.github.bytejuno.theta.agent.skill.SkillRuntime
+import io.github.bytejuno.theta.agent.browser.BrowserSessionRegistry
+import io.github.bytejuno.theta.agent.device.RootAccess
+import io.github.bytejuno.theta.agent.terminal.TerminalRuntime
+import io.github.bytejuno.theta.config.Prefs
+import io.github.bytejuno.theta.core.AndroidAgentLogger
+import io.github.bytejuno.theta.core.safeLogType
+import io.github.bytejuno.theta.data.datastore.SettingsDataStore
+import io.github.bytejuno.theta.data.repository.AgentMemoryRepository
+import io.github.bytejuno.theta.data.repository.AppearanceSettingsRepository
+import io.github.bytejuno.theta.data.repository.McpServerRepository
+import io.github.bytejuno.theta.data.repository.LinuxEnvironmentSettingsRepository
+import io.github.bytejuno.theta.data.repository.ProviderRepository
+import io.github.bytejuno.theta.ui.app.PredictiveBackController
+import io.github.libxposed.service.XposedService
+import io.github.libxposed.service.XposedServiceHelper
+import java.util.concurrent.CopyOnWriteArraySet
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+
+/**
+ * 模块 UI 进程的 Application。
+ *
+ * 在进程启动时注册 [XposedServiceHelper] 监听器，框架会通过 XposedProvider 推送 binder，
+ * 随后 UI 即可拿到 [XposedService] 写入 RemotePreferences，跨进程同步到各 hook 进程。
+ *
+ * UI 侧通过 [XposedService] 写入 RemotePreferences。
+ */
+class EtaApp : Application(), XposedServiceHelper.OnServiceListener {
+
+    private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    interface ServiceStateListener {
+        fun onServiceStateChanged(service: XposedService?)
+    }
+
+    override fun onCreate() {
+        super.onCreate()
+        Prefs.initLocal(this)
+        if (!AppProcessPolicy.shouldInitializeFullRuntime(Application.getProcessName(), packageName)) {
+            return
+        }
+        io.github.bytejuno.theta.core.DiagnosticsBundle.install(this)
+        runCatching { io.github.bytejuno.theta.data.repository.AutoBackupScheduler.schedule(this) }
+        TerminalRuntime.initialize(this)
+        RootAccess.initialize(this)
+        applicationScope.launch { TerminalRuntime.backgroundJobs(this@EtaApp).resume() }
+        SettingsDataStore.init(this)
+        val predictiveBackEnabled = runBlocking(Dispatchers.IO) {
+            runCatching { SettingsDataStore.migrateVirtualDisplayPreferences() }
+                .onFailure { AndroidAgentLogger.warn("Virtual display preference migration unavailable") }
+            AppearanceSettingsRepository.settings().predictiveBackEnabled
+        }
+        PredictiveBackController.apply(applicationInfo, predictiveBackEnabled)
+        AgentMemoryRepository.init(this)
+        ProviderRepository.init(this)
+        McpServerRepository.init(this)
+        applicationScope.launch(Dispatchers.IO) {
+            runCatching { io.github.bytejuno.theta.data.repository.LearningProposalRepository.recoverInterrupted(this@EtaApp) }
+                .onFailure { AndroidAgentLogger.warn("Learning approval recovery unavailable") }
+            runCatching {
+                io.github.bytejuno.theta.data.db.EtaDatabase.get(this@EtaApp).agentTaskDao().recoverInterrupted(System.currentTimeMillis())
+                io.github.bytejuno.theta.agent.automation.AgentTaskScheduler.enqueueDue(this@EtaApp)
+                io.github.bytejuno.theta.agent.automation.AgentTaskScheduler.refresh(this@EtaApp)
+            }.onFailure { AndroidAgentLogger.warn("Automation recovery unavailable") }
+        }
+        XposedServiceHelper.registerListener(this)
+        applicationScope.launch {
+            try {
+                SpeechOssUpload(this@EtaApp).retryPending(this@EtaApp)
+            } catch (error: Exception) {
+                if (error is kotlinx.coroutines.CancellationException) throw error
+                AndroidAgentLogger.warn("Eta speech cleanup unavailable: type=${error.javaClass.simpleName}")
+            }
+        }
+        applicationScope.launch {
+            LinuxEnvironmentSettingsRepository.initialize(this@EtaApp)
+            runCatching {
+                SkillRuntime.createIndexService(this@EtaApp).listInstalledSkills()
+            }.onFailure { throwable ->
+                AndroidAgentLogger.warn(
+                    "Agent skill index prewarm failed: type=${throwable.safeLogType()}"
+                )
+            }
+        }
+    }
+
+    override fun onTrimMemory(level: Int) {
+        super.onTrimMemory(level)
+        if (level == ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW ||
+            level == ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL ||
+            level >= ComponentCallbacks2.TRIM_MEMORY_BACKGROUND) {
+            BrowserSessionRegistry.releaseIdlePages()
+        }
+    }
+
+    override fun onLowMemory() {
+        super.onLowMemory()
+        BrowserSessionRegistry.releaseIdlePages()
+    }
+
+    override fun onServiceBind(service: XposedService) {
+        serviceInstance = service
+        Prefs.reconcileAgentPreferences(service)
+        dispatch(service)
+    }
+
+    override fun onServiceDied(service: XposedService) {
+        // 只有当前持有的 service 死亡时才清空并派发 null；
+        // 多 framework 场景下死掉的可能是已被替换的旧实例，无需影响 UI。
+        if (serviceInstance === service) {
+            serviceInstance = null
+            dispatch(null)
+        }
+    }
+
+    companion object {
+        @Volatile
+        var serviceInstance: XposedService? = null
+            private set
+
+        private val listeners = CopyOnWriteArraySet<ServiceStateListener>()
+        private val mainHandler = Handler(Looper.getMainLooper())
+
+        fun addServiceStateListener(listener: ServiceStateListener, notifyImmediately: Boolean) {
+            listeners.add(listener)
+            if (notifyImmediately) {
+                dispatchTo(listener, serviceInstance)
+            }
+        }
+
+        fun removeServiceStateListener(listener: ServiceStateListener) {
+            listeners.remove(listener)
+        }
+
+        private fun dispatch(service: XposedService?) {
+            listeners.forEach { dispatchTo(it, service) }
+        }
+
+        private fun dispatchTo(listener: ServiceStateListener, service: XposedService?) {
+            if (Looper.myLooper() == Looper.getMainLooper()) {
+                listener.onServiceStateChanged(service)
+            } else {
+                mainHandler.post {
+                    if (listeners.contains(listener)) {
+                        listener.onServiceStateChanged(service)
+                    }
+                }
+            }
+        }
+    }
+}

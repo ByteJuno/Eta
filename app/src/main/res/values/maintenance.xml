@@ -4,7 +4,7 @@
     <string name="auto_backup_warning">Backups include chats, memory and provider credentials in plaintext. Choose a trusted folder; cloud folders may upload these files. Enabling confirms this.</string>
     <string name="auto_backup_enable">Enable daily auto backup — select folder</string>
     <string name="auto_backup_disable">Disable auto backup</string>
-    <string name="auto_backup_summary">Runs about daily while charging and battery is not low. Keeps seven completed backups created by Eta. Android may delay execution.</string>
+    <string name="auto_backup_summary">Runs about daily while charging and battery is not low. Keeps seven completed backups created by Theta. Android may delay execution.</string>
     <string name="auto_backup_now">Back up now</string>
     <string name="diagnostics_export">Export diagnostic ZIP</string>
     <string name="diagnostics_summary">Contains app/API version, device model and the last redacted crash stack only. No chat, credentials, notifications or full device logs.</string>

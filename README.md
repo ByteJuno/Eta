@@ -1,4 +1,6 @@
-<h1 align="center">Eta</h1>
+<h1 align="center">Theta</h1>
+
+**Theta（西塔）** 是 ByteJuno 基于 [Eta](https://github.com/Mangi-11/Eta) 开发的独立 Android 行动助手，不是 Eta 官方版本。应用包名现为 `io.github.bytejuno.theta`，Android 将其视为独立应用，可与旧 Eta 并存；旧会话、设置与授权不会自动迁移。项目继续遵循 [PolyForm Noncommercial 1.0.0](LICENSE)，保留上游署名；下方历史截图及上游功能说明中的 Eta 指上游项目。
 
 > **关于这个 fork（3.4.0-fork.1）**：基于 [Mangi-11/Eta](https://github.com/Mangi-11/Eta) 3.4.0，保留多会话并行、自动任务、经验学习与审批中心等 fork 功能。虚拟屏现使用上游唯一引擎及胶囊预览/触控接管；补入 Android 15+ Root 初始化与独立显示组唤醒兼容、每轮主屏 GUI 授权、会话内「虚拟屏/主屏」选择、共享交互租约和旧设置迁移。下方上游功能说明保留原文；本 fork 的主屏授权差异以 [虚拟屏说明](docs/VIRTUAL_SCREEN.md) 为准。仅供个人使用，不发布安装包；许可证与上游相同（PolyForm Noncommercial 1.0.0），未经原作者书面授权请勿二次分发。
 

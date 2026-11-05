@@ -4,7 +4,7 @@
     <string name="auto_backup_warning">备份包含聊天、记忆与服务商凭据，采用明文格式。请选择可信目录；云盘目录可能上传这些文件。启用即表示确认。</string>
     <string name="auto_backup_enable">启用每日自动备份并选择目录</string>
     <string name="auto_backup_disable">关闭自动备份</string>
-    <string name="auto_backup_summary">约每日充电且电量不低时执行，保留七份 Eta 自动创建的完整备份。Android 可能延迟执行。</string>
+    <string name="auto_backup_summary">约每日充电且电量不低时执行，保留七份 Theta 自动创建的完整备份。Android 可能延迟执行。</string>
     <string name="auto_backup_now">立即备份</string>
     <string name="diagnostics_export">导出诊断 ZIP</string>
     <string name="diagnostics_summary">仅包含应用/API 版本、设备型号与最近一次脱敏崩溃栈，不包含聊天、凭据、通知正文或完整设备日志。</string>
