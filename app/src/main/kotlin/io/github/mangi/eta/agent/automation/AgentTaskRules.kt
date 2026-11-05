@@ -31,10 +31,13 @@ internal object AgentTaskRules {
         "device_boot",
         "memory_updated",
         "task_completed",
-        "task_failed"
+        "task_failed",
+        "shared_content",
+        "battery_level",
     )
     private val filterFields =
-        setOf("packageName", "titleContains", "textContains", "taskId", "transport")
+        setOf("packageName", "titleContains", "textContains", "taskId", "transport", "ssid", "deviceName", "kind")
+    val sharedContentKinds = setOf("text", "link", "image", "file")
 
     fun validate(raw: JSONObject): JSONObject {
         require(raw.toString().length <= 4000) { "触发规则过长" }
@@ -44,8 +47,9 @@ internal object AgentTaskRules {
             "once" -> setOf("type", "at")
             "interval" -> setOf("type", "seconds", "startAt")
             "daily" -> setOf("type", "time", "timeZone", "weekdays")
+            "battery_level" -> setOf("type", "below", "above")
             else -> setOf("type", "filters")
-        } + "conditions"
+        } + setOf("conditions", "conditionsAny")
         require(raw.keys().asSequence().all { it in fields }) { "触发规则包含不支持的字段" }
         when (type) {
             "once" -> parseInstant(raw.getString("at"))
@@ -70,6 +74,11 @@ internal object AgentTaskRules {
                 }
                 require(!raw.has("weekdays") || raw.optJSONArray("weekdays") != null) { "weekdays 需要数组" }
             }
+
+            "battery_level" -> {
+                require(raw.has("below") != raw.has("above")) { "battery_level 需要 below 或 above 其中之一" }
+                if (raw.has("below")) integer(raw, "below", 1, 99) else integer(raw, "above", 1, 99)
+            }
         }
         raw.optJSONObject("filters")?.let { filters ->
             require(
@@ -89,26 +98,27 @@ internal object AgentTaskRules {
 
                 "app_foreground" -> setOf("packageName")
                 "task_completed", "task_failed" -> setOf("taskId")
-                "network_connected", "network_disconnected" -> setOf("transport")
+                "network_connected", "network_disconnected" -> setOf("transport", "ssid")
+                "bluetooth_connected", "bluetooth_disconnected" -> setOf("deviceName")
+                "shared_content" -> setOf("kind", "textContains")
                 else -> emptySet()
             }
             require(
                 filters.keys().asSequence().all { it in allowed }) { "该触发器不支持此过滤字段" }
+            filters.optString("kind").takeIf(String::isNotEmpty)?.let { kind ->
+                require(kind in sharedContentKinds) { "kind 需要 text、link、image 或 file" }
+            }
         }
         require(!raw.has("filters") || raw.optJSONObject("filters") != null) { "filters 需要对象" }
-        raw.optJSONObject("conditions")?.let { conditions ->
-            require(
-                conditions.keys().asSequence().all {
-                    it in setOf(
-                        "charging",
-                        "unlocked",
-                        "networkConnected"
-                    )
-                }) { "不支持此附加条件" }
-            conditions.keys()
-                .forEach { require(conditions.get(it) is Boolean) { "条件值需要 boolean" } }
+        for (field in listOf("conditions", "conditionsAny")) {
+            raw.optJSONObject(field)?.let { conditions ->
+                require(conditions.keys().asSequence().all { it in conditionNames }) { "不支持此附加条件" }
+                conditions.keys()
+                    .forEach { require(conditions.get(it) is Boolean) { "条件值需要 boolean" } }
+                if (field == "conditionsAny") require(conditions.length() >= 2) { "conditionsAny 至少需要两个条件" }
+            }
+            require(!raw.has(field) || raw.optJSONObject(field) != null) { "$field 需要对象" }
         }
-        require(!raw.has("conditions") || raw.optJSONObject("conditions") != null) { "conditions 需要对象" }
         return JSONObject(raw.toString())
     }
 
@@ -150,22 +160,76 @@ internal object AgentTaskRules {
 
     fun matches(rule: JSONObject, type: String, event: JSONObject): Boolean {
         if (rule.optString("type") != type) return false
+        if (type == "battery_level") return batteryCrossed(rule, event)
         val filters = rule.optJSONObject("filters") ?: JSONObject()
         return filters.keys().asSequence().all { field ->
             val value = filters.getString(field)
             when (field) {
                 "titleContains" -> event.optString("title").contains(value, ignoreCase = true)
                 "textContains" -> event.optString("text").contains(value, ignoreCase = true)
+                // 名称由用户输入，大小写与系统展示可能不同。
+                "ssid", "deviceName" -> event.optString(field).equals(value, ignoreCase = true)
                 else -> event.optString(field) == value
             }
         }
     }
 
-    fun conditionsMatch(rule: JSONObject, state: Map<String, Boolean>): Boolean =
-        rule.optJSONObject("conditions")?.let { conditions ->
+    /** 只在越过阈值的那一次触发，电量在阈值附近波动时不会反复运行。 */
+    private fun batteryCrossed(rule: JSONObject, event: JSONObject): Boolean {
+        if (!event.has("level") || !event.has("previous")) return false
+        val level = event.optInt("level")
+        val previous = event.optInt("previous")
+        return if (rule.has("below")) {
+            val threshold = rule.getInt("below")
+            level < threshold && previous >= threshold
+        } else {
+            val threshold = rule.getInt("above")
+            level > threshold && previous <= threshold
+        }
+    }
+
+    val conditionNames = setOf("charging", "unlocked", "networkConnected")
+
+    /** conditions 全部满足，且 conditionsAny（若有）至少一项满足。 */
+    fun conditionsMatch(rule: JSONObject, state: Map<String, Boolean>): Boolean {
+        val all = rule.optJSONObject("conditions")?.let { conditions ->
             conditions.keys().asSequence()
                 .all { name -> state[name] == conditions.getBoolean(name) }
         } ?: true
+        val any = rule.optJSONObject("conditionsAny")?.let { conditions ->
+            conditions.keys().asSequence()
+                .any { name -> state[name] == conditions.getBoolean(name) }
+        } ?: true
+        return all && any
+    }
+
+    /**
+     * 任务结果触发把 filters.taskId 指向的任务作为上游。每个任务只有一个触发器，依赖是单链，
+     * 从候选任务向上游走回到自身即成环。返回环上的任务 ID（从候选开始），无环返回 null。
+     * 只考虑启用的任务：停用任务在重新启用时会再次检查。
+     */
+    fun findDependencyCycle(
+        enabledRules: Map<String, JSONObject>,
+        candidateId: String,
+        candidateRule: JSONObject,
+    ): List<String>? {
+        val rules = enabledRules + (candidateId to candidateRule)
+        val path = mutableListOf(candidateId)
+        var upstream = upstreamTaskId(candidateRule)
+        while (upstream != null) {
+            if (upstream == candidateId) return path
+            if (upstream in path) return null
+            path += upstream
+            upstream = rules[upstream]?.let(::upstreamTaskId)
+        }
+        return null
+    }
+
+    private fun upstreamTaskId(rule: JSONObject): String? =
+        rule.takeIf { it.optString("type") in setOf("task_completed", "task_failed") }
+            ?.optJSONObject("filters")
+            ?.optString("taskId")
+            ?.takeIf(String::isNotBlank)
 
     fun integer(
         args: JSONObject,

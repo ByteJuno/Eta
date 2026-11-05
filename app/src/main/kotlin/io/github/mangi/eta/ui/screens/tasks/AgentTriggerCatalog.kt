@@ -40,7 +40,7 @@ internal data class TaskTriggerUi(val type: String, val available: Boolean) {
     val group: TaskTriggerGroup get() = when (type) {
         in AgentTaskRules.timeTypes -> TaskTriggerGroup.TIME
         "network_connected", "network_disconnected", "bluetooth_connected", "bluetooth_disconnected", "headset_connected", "headset_disconnected" -> TaskTriggerGroup.CONNECTION
-        "notification_posted", "notification_removed", "app_foreground" -> TaskTriggerGroup.APPS
+        "notification_posted", "notification_removed", "app_foreground", "shared_content" -> TaskTriggerGroup.APPS
         "memory_updated", "task_completed", "task_failed" -> TaskTriggerGroup.ETA
         else -> TaskTriggerGroup.DEVICE
     }
@@ -97,6 +97,9 @@ internal fun TriggerDetails(trigger: TaskTriggerUi, onDismiss: () -> Unit) {
         "bluetooth_connected", "bluetooth_disconnected" -> R.string.automation_trigger_scope_bluetooth
         "task_completed", "task_failed" -> R.string.automation_trigger_scope_task
         "memory_updated" -> R.string.automation_trigger_scope_memory
+        "shared_content" -> R.string.automation_trigger_scope_shared
+        "battery_level" -> R.string.automation_trigger_scope_battery_level
+        "network_connected", "network_disconnected" -> R.string.automation_trigger_scope_network
         "device_boot" -> R.string.automation_trigger_scope_boot
         else -> R.string.automation_trigger_scope_monitor
     }
