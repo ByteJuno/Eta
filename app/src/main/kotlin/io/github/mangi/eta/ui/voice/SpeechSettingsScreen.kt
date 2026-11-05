@@ -77,6 +77,17 @@ internal fun SpeechSettingsScreen(onBack: () -> Unit, onNavigate: (AppRoute) -> 
                             }
                         },
                     )
+                    SwitchPreference(
+                        title = stringResource(R.string.speech_continuous_conversation),
+                        summary = stringResource(R.string.speech_continuous_conversation_summary),
+                        checked = current.continuousConversation,
+                        enabled = current.autoSpeak && current.tts != TtsProvider.NONE && current.recognitionEnabled,
+                        onCheckedChange = { enabled ->
+                            scope.launch {
+                                SpeechSettingsRepository.save(current.copy(continuousConversation = enabled))
+                            }
+                        },
+                    )
                 }
                 SpeechNote(stringResource(R.string.speech_overview_note))
             }

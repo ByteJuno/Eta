@@ -297,6 +297,16 @@ internal class EtaAssistantOverlayService : Service(), LifecycleOwner, SavedStat
         speechInput.start(holdToTalk = holdToTalk)
     }
 
+    /**
+     * 连续对话：回答完整播完后再次聆听。用户点麦克风、发新问题或关窗都会先停掉朗读，
+     * 因此不会走到这里；聆听没听到内容时自然结束，不会循环空转。
+     */
+    private fun resumeContinuousConversation() {
+        if (activeRunId != null || hiddenForForegroundOperation || windowView?.isShown != true) return
+        if (!getSystemService(PowerManager::class.java).isInteractive) return
+        startSpeech()
+    }
+
     private fun cancelSpeech() {
         speechInput.cancel()
         speechHeld = false
@@ -545,7 +555,13 @@ internal class EtaAssistantOverlayService : Service(), LifecycleOwner, SavedStat
                     getSystemService(PowerManager::class.java).isInteractive &&
                     speechConfig?.autoSpeak == true && speechConfig.tts != TtsProvider.NONE) {
                     val messageId = uiState.messages.filterIsInstance<AgentMessageUi>().lastOrNull()?.id ?: runId
-                    playback.speak(messageId, result.content, settings = speechConfig)
+                    val continueListening = speechConfig.continuousConversation && speechConfig.recognitionEnabled
+                    playback.speak(
+                        messageId,
+                        result.content,
+                        settings = speechConfig,
+                        onFinished = if (continueListening) ::resumeContinuousConversation else null,
+                    )
                 }
                 if (!hiddenForForegroundOperation) {
                     updateSoftInput(visible = false)

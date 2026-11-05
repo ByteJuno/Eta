@@ -89,6 +89,8 @@ data class SpeechSettings(
     val refineTranscript: Boolean = false,
     /** 只控制 Eta 自身的语音输入，关闭时保留服务配置以便再次开启。 */
     val recognitionEnabled: Boolean = true,
+    /** 助手浮窗连续对话：语音提问的回答播报完后自动再次聆听；需要开启自动播报。 */
+    val continuousConversation: Boolean = false,
 ) {
     companion object {
         const val DEFAULT_AUTO_SEND_SILENCE_MS = 2_000

@@ -1284,6 +1284,8 @@
   <string name="speech_group_voice">Voice</string>
   <string name="speech_auto_speak">Speak answers automatically</string>
   <string name="speech_auto_speak_summary">Only speaks final answers to voice questions while the assistant overlay is visible</string>
+  <string name="speech_continuous_conversation">Continuous conversation</string>
+  <string name="speech_continuous_conversation_summary">After a spoken question\'s answer is read aloud, start listening again. Tap the mic to interrupt playback; the loop ends when nothing is heard.</string>
   <string name="speech_overview_note">Dictation in chat turns speech into editable text first. Answers can be read aloud manually; recording stops playback.</string>
   <string name="speech_service_and_model">Service &amp; model</string>
   <string name="speech_asr_qwen_realtime">Qwen · Realtime</string>

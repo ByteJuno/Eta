@@ -1253,6 +1253,8 @@
   <string name="speech_group_voice">聲音</string>
   <string name="speech_auto_speak">自動播報回答</string>
   <string name="speech_auto_speak_summary">僅在助手浮窗可見時播報語音提問的最終回答</string>
+  <string name="speech_continuous_conversation">連續對話</string>
+  <string name="speech_continuous_conversation_summary">語音提問的回答朗讀完後自動再次聆聽；朗讀時點麥克風可打斷，沒聽到聲音時結束。</string>
   <string name="speech_overview_note">聊天中的語音輸入會先轉成可編輯文字。回答可手動朗讀，開始錄音會停止播放。</string>
   <string name="speech_service_and_model">服務與模型</string>
   <string name="speech_asr_qwen_realtime">千問 · 即時識別</string>
