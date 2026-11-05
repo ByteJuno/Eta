@@ -286,6 +286,7 @@ internal fun AgentChatBody(
             onRemoveFileReference = onRemoveFileReference,
             onEditMessage = onEditMessage,
             onCancelMessageEdit = onCancelMessageEdit,
+            onSaveDraft = onSaveDraft,
             onDeleteMessage = onDeleteMessage,
             onRegenerateMessage = onRegenerateMessage,
             onSelectReplyCandidate = onSelectReplyCandidate,
@@ -343,6 +344,7 @@ private fun AgentChatScaffold(
     onRemoveFileReference: (String) -> Unit,
     onEditMessage: (String) -> Unit,
     onCancelMessageEdit: () -> Unit,
+    onSaveDraft: (String, Int) -> Unit,
     onDeleteMessage: (String) -> Unit,
     onRegenerateMessage: (String) -> Unit,
     onSelectReplyCandidate: (String, Int) -> Unit,
@@ -408,6 +410,7 @@ private fun AgentChatScaffold(
                 onAttachFilePath = onAttachFilePath,
                 onRemoveFileReference = onRemoveFileReference,
                 onCancelMessageEdit = onCancelMessageEdit,
+                onSaveDraft = onSaveDraft,
             )
         },
     ) { innerPadding ->
@@ -1028,6 +1031,7 @@ private fun AgentChatBottomBar(
     onAttachFilePath: (String) -> Unit,
     onRemoveFileReference: (String) -> Unit,
     onCancelMessageEdit: () -> Unit,
+    onSaveDraft: (String, Int) -> Unit,
 ) {
     Column(
         modifier = Modifier

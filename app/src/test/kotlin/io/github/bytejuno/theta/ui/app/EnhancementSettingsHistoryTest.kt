@@ -42,6 +42,27 @@ class EnhancementSettingsHistoryTest {
     }
 
     @Test
+    fun restoreMissingIntoRefillsOnlyKeysLostByRemoteStore() {
+        val source = context.getSharedPreferences("test_remote_lost", Context.MODE_PRIVATE)
+        source.edit().clear()
+            .putBoolean(Prefs.Keys.HOTWORD_SELF_HEAL, true)
+            .putString(Prefs.Keys.POWER_KEY_ASSISTANT_TARGET, PowerAssistantTarget.ETA.persistedValue)
+            .commit()
+        val history = EnhancementSettingsHistory(context)
+        assertEquals(0, history.restoreMissingInto(source))
+        history.captureConnected(source)
+
+        // 模拟 LSPosed 重装后远程存储被清空，另有一个键已被用户在新连接下改过。
+        source.edit().clear().putBoolean(Prefs.Keys.HOTWORD_SELF_HEAL, false).commit()
+        val restored = history.restoreMissingInto(source)
+
+        assertTrue(restored > 0)
+        assertEquals(PowerAssistantTarget.ETA, Prefs.powerAssistantTarget(source))
+        assertFalse(source.getBoolean(Prefs.Keys.HOTWORD_SELF_HEAL, true))
+        assertEquals(0, history.restoreMissingInto(source))
+    }
+
+    @Test
     fun existingSystemizerEntrySurvivesLossOfCurrentRootAccess() {
         val history = EnhancementSettingsHistory(context)
         assertFalse(history.hasUsedSystemizer)

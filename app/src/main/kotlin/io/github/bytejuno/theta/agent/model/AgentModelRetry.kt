@@ -3,6 +3,7 @@ package io.github.bytejuno.theta.agent.model
 import io.github.bytejuno.theta.agent.runtime.AgentEvent
 import io.github.bytejuno.theta.agent.runtime.AgentRunController
 import io.github.bytejuno.theta.agent.runtime.AgentTokenUsage
+import io.github.bytejuno.theta.agent.runtime.AgentUsageLedger
 
 /** 重试只包围模型请求；完整响应返回前不提交历史或执行本地工具。 */
 internal class AgentModelRetry(
@@ -45,6 +46,11 @@ internal class AgentModelRetry(
                     }
                 }
                 usage?.let {
+                    AgentUsageLedger.record(
+                        request.config.model,
+                        it,
+                        cacheExcludedFromInput = provider.capabilities.endpoint == EndpointKind.ANTHROPIC_MESSAGES,
+                    )
                     try {
                         onEvent(AgentEvent.UsageReceived(round, it.copy(
                             requestDurationMs = ((nanoTime() - startedAt) / 1_000_000).coerceAtLeast(1),

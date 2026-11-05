@@ -5,7 +5,10 @@ import android.content.SharedPreferences
 import io.github.bytejuno.theta.config.PowerAssistantTarget
 import io.github.bytejuno.theta.config.Prefs
 
-/** 只用于断连后的界面展示；从不作为 Hook 配置来源，也不接收离线配置修改。 */
+/**
+ * 断连后的界面展示快照；不接收离线配置修改。唯一的回写是 [restoreMissingInto]：
+ * 远程配置整键丢失时补回最后一次已连接时的值，不覆盖远程已有的键。
+ */
 internal class EnhancementSettingsHistory(context: Context) {
     private val snapshot = context.applicationContext.getSharedPreferences("eta_enhancement_ui_history", Context.MODE_PRIVATE)
 
@@ -21,6 +24,34 @@ internal class EnhancementSettingsHistory(context: Context) {
             putString(Prefs.Keys.POWER_KEY_ASSISTANT_TARGET, Prefs.powerAssistantTarget(preferences).persistedValue)
         }.apply()
     }
+
+    /**
+     * LSPosed 在模块重装后可能丢失远程配置内存副本（上游 #215），Hook 端随之读到默认值。
+     * 连接时把远程缺失、但本地快照里有过提交记录的键补写回去；必须先于 [captureConnected]，
+     * 否则快照会被远程默认值覆盖。返回补写的键数，commit 失败返回 0。
+     */
+    fun restoreMissingInto(preferences: SharedPreferences): Int {
+        if (!hasConnected) return 0
+        val editor = preferences.edit()
+        var restored = 0
+        Prefs.Keys.BOOLEAN_DEFAULTS.keys
+            .filter { it !in Prefs.Keys.LOCAL_AGENT_KEYS && snapshot.contains(it) }
+            .filterNot { preferences.safeContains(it) }
+            .forEach { key ->
+                editor.putBoolean(key, snapshot.getBoolean(key, Prefs.Keys.BOOLEAN_DEFAULTS.getValue(key)))
+                restored++
+            }
+        val target = Prefs.Keys.POWER_KEY_ASSISTANT_TARGET
+        if (snapshot.contains(target) && !preferences.safeContains(target)) {
+            editor.putString(target, snapshot.getString(target, null))
+            restored++
+        }
+        if (restored == 0) return 0
+        return if (runCatching { editor.commit() }.getOrDefault(false)) restored else 0
+    }
+
+    private fun SharedPreferences.safeContains(key: String): Boolean =
+        runCatching { contains(key) }.getOrDefault(true)
 
     fun checked(key: String, default: Boolean): Boolean = snapshot.getBoolean(key, default)
 

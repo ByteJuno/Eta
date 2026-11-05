@@ -50,6 +50,7 @@ internal object Prefs {
         const val AGENT_THINKING_ENABLED = "agent_thinking_enabled"
         const val AGENT_AUTO_COMPACTION_ENABLED = "agent_auto_compaction_enabled"
         const val AGENT_SUBAGENT_ENABLED = "agent_subagent_enabled"
+        const val AGENT_LAZY_TOOL_GROUPS = "agent_lazy_tool_groups"
         const val AGENT_VIRTUAL_DISPLAY_ENABLED = "agent_virtual_display_enabled"
         const val AGENT_RUNTIME_CONFIG_JSON = "agent_runtime_config_json"
 
@@ -73,6 +74,7 @@ internal object Prefs {
             AGENT_THINKING_ENABLED to true,
             AGENT_AUTO_COMPACTION_ENABLED to true,
             AGENT_SUBAGENT_ENABLED to true,
+            AGENT_LAZY_TOOL_GROUPS to false,
             AGENT_VIRTUAL_DISPLAY_ENABLED to true,
         )
 
@@ -87,6 +89,7 @@ internal object Prefs {
             AGENT_AUTO_COMPACTION_ENABLED,
             AGENT_SUBAGENT_ENABLED,
             AGENT_VIRTUAL_DISPLAY_ENABLED,
+            AGENT_LAZY_TOOL_GROUPS,
         )
     }
 

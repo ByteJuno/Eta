@@ -12,7 +12,7 @@ Eta is a single-module Android assistant built with Kotlin and Jetpack Compose.
 
 ## Build, Test, and Development Commands
 
-For the `ByteJuno/Eta` fork, integrate approved work into `main` and run compilation, unit tests, Lint and APK packaging only from `main` in GitHub Actions. Do not dispatch builds on feature branches or tags. Do not run Gradle locally unless explicitly requested. Push to origin/main, then dispatch Eta Build with ref=main; verify the exact commit and signed APK artifact. The workflow enforces this: Eta Build jobs run only on main or v* tags. See `.github/RELEASING.md`. Do not submit upstream PRs without user authorization.
+For the `ByteJuno/Theta` fork, integrate approved work into `main` and run compilation, unit tests, Lint and APK packaging only from `main` in GitHub Actions. Do not dispatch builds on feature branches or tags. Do not run Gradle locally unless explicitly requested. Push to origin/main, then dispatch Eta Build with ref=main; verify the exact commit and signed APK artifact. The workflow enforces this: Eta Build jobs run only on main or v* tags. See `.github/RELEASING.md`. Do not submit upstream PRs without user authorization.
 
 Use JDK 25 and Android SDK 37 (`platforms;android-37.0`); configure `sdk.dir` in ignored `local.properties`. Run commands from the repository root:
 

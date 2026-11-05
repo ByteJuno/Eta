@@ -21,6 +21,8 @@ internal object AgentRuntimePolicy {
         val autoCompaction: Boolean = Prefs.Keys.BOOLEAN_DEFAULTS.getValue(Prefs.Keys.AGENT_AUTO_COMPACTION_ENABLED),
         val subagentTools: Boolean = Prefs.Keys.BOOLEAN_DEFAULTS.getValue(Prefs.Keys.AGENT_SUBAGENT_ENABLED),
         val virtualDisplay: Boolean = Prefs.Keys.BOOLEAN_DEFAULTS.getValue(Prefs.Keys.AGENT_VIRTUAL_DISPLAY_ENABLED),
+        /** 不是授权，只是 Runtime 读取同一份本地设置的入口：精简工具目录。 */
+        val lazyToolGroups: Boolean = Prefs.Keys.BOOLEAN_DEFAULTS.getValue(Prefs.Keys.AGENT_LAZY_TOOL_GROUPS),
     )
 
     fun permissions(preferences: SharedPreferences?): Permissions =
@@ -36,6 +38,7 @@ internal object AgentRuntimePolicy {
             autoCompaction = preferences.allowed(Prefs.Keys.AGENT_AUTO_COMPACTION_ENABLED),
             subagentTools = preferences.allowed(Prefs.Keys.AGENT_SUBAGENT_ENABLED),
             virtualDisplay = preferences.allowed(Prefs.Keys.AGENT_VIRTUAL_DISPLAY_ENABLED),
+            lazyToolGroups = preferences.allowed(Prefs.Keys.AGENT_LAZY_TOOL_GROUPS),
         )
 
     fun constrain(

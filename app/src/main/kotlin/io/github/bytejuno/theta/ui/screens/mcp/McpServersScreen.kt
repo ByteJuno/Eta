@@ -29,6 +29,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import io.github.bytejuno.theta.R
 import io.github.bytejuno.theta.agent.mcp.McpServerManager
+import io.github.bytejuno.theta.agent.mcp.McpToolLimits
 import io.github.bytejuno.theta.agent.mcp.validateMcpEndpoint
 import io.github.bytejuno.theta.data.model.McpAuthorizationType
 import io.github.bytejuno.theta.data.model.McpProtocolMode
@@ -116,6 +117,15 @@ internal fun McpServersScreen(
                         )
                     }
                 }
+            }
+            val enabledTotal = McpToolLimits.enabledAcross(servers)
+            if (enabledTotal > McpToolLimits.MAX_RUN_TOOLS) {
+                Text(
+                    text = stringResource(R.string.mcp_run_limit_warning, enabledTotal, McpToolLimits.MAX_RUN_TOOLS),
+                    style = MiuixTheme.textStyles.footnote2,
+                    color = MiuixTheme.colorScheme.error,
+                    modifier = Modifier.padding(horizontal = 24.dp).padding(bottom = 12.dp),
+                )
             }
         }
     }
@@ -312,6 +322,14 @@ internal fun McpServerDetailScreen(
         }
         item(key = "tools") {
             SmallTitle(stringResource(R.string.mcp_tools_count, server.tools.size))
+            if (McpToolLimits.isLikelyTruncated(server.tools)) {
+                Text(
+                    text = stringResource(R.string.mcp_catalog_truncated, server.tools.size),
+                    style = MiuixTheme.textStyles.footnote2,
+                    color = MiuixTheme.colorScheme.error,
+                    modifier = Modifier.padding(horizontal = 24.dp).padding(bottom = 8.dp),
+                )
+            }
             Card(
                 modifier = Modifier
                     .padding(horizontal = 12.dp)

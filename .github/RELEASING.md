@@ -2,7 +2,7 @@
 
 - 用户最终指定的集成与构建分支为 `main`。
 - 功能分支仅用于编辑和审查；获准改动合入 `main` 后再构建。
-- 推送后执行：`gh workflow run android-release.yml --repo ByteJuno/Eta --ref main`。
+- 推送后执行：`gh workflow run android-release.yml --repo ByteJuno/Theta --ref main`。
 - 核对运行提交号，验证 Lint、完整单元测试、Debug 和签名 Release；不自动安装或公开发布。
 - 非标签构建的 versionCode 由 CI 按提交时间（北京时间）生成：`yyyyMMdd` + 当日 15 分钟时段 `00–95`，只会高于 `app/build.gradle.kts` 中的手写值；后续提交的包可直接覆盖安装，同一提交重复构建结果一致。
 - fork 已关闭应用内更新检查：上游 Release 使用不同签名，无法覆盖安装本 fork。
@@ -16,12 +16,12 @@
 
 ## Fork 开发测试约定
 
-`ByteJuno/Eta` 的编译、单元测试、Lint 和 APK 打包统一在 GitHub Actions 执行；默认不在本机运行 Gradle。开发时将改动推送到功能分支并审查，合入 `main` 后再手动触发云端构建：
+`ByteJuno/Theta` 的编译、单元测试、Lint 和 APK 打包统一在 GitHub Actions 执行；默认不在本机运行 Gradle。开发时将改动推送到功能分支并审查，合入 `main` 后再手动触发云端构建：
 
 ```bash
 git push origin main
-gh workflow run android-release.yml --repo ByteJuno/Eta --ref main
-gh run list --repo ByteJuno/Eta --workflow android-release.yml --branch main
+gh workflow run android-release.yml --repo ByteJuno/Theta --ref main
+gh run list --repo ByteJuno/Theta --workflow android-release.yml --branch main
 ```
 
 确认运行的提交号与推送提交一致，并检查 Lint、完整单元测试、Debug 与签名 Release 构建结果。测试安装包从该次运行的 Artifacts 下载。功能分支不需要推送标签或公开发布 Release。用户完成真机验收并确认后，再整理上游 PR。
@@ -82,7 +82,7 @@ Release 草稿。
 Debug APK 会先独立构建并上传；签名配置缺失或 Release 构建失败时，
 已生成的 Debug Artifact 仍可下载，工作流会继续明确报告 Release 失败。
 
-`ByteJuno/Eta` fork 使用独立的持久发布证书，四项 Secrets 已配置。
+`ByteJuno/Theta` fork 使用独立的持久发布证书，四项 Secrets 已配置。
 Windows 本机备份位于 `~/.local/share/eta-artifical0/signing/`，其中
 `eta-artifical0-release.jks` 为证书，`credentials.json` 为签名参数。
 Windows ACL 仅允许当前用户和 SYSTEM 访问；备份不在 Git 内。

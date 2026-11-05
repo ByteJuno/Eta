@@ -231,11 +231,15 @@ internal class McpHttpClient(
             }
             val page = result.optJSONArray("tools") ?: JSONArray()
             for (index in 0 until page.length()) {
-                if (tools.size >= MAX_DISCOVERED_TOOLS) break
-                page.optJSONObject(index)?.let { tools += parseTool(it) }
+                val tool = page.optJSONObject(index)?.let(::parseTool) ?: continue
+                // 数量与总体积都设上限：工具目录整行存入 Room，过大的行会撑爆 CursorWindow。
+                if (!McpToolLimits.fits(tools, tool)) {
+                    return ToolList(tools, cacheTtlMs)
+                }
+                tools += tool
             }
             cursor = result.optString("nextCursor").takeIf { it.isNotBlank() }
-            if (cursor == null || tools.size >= MAX_DISCOVERED_TOOLS) {
+            if (cursor == null) {
                 return ToolList(tools, cacheTtlMs)
             }
         }
@@ -493,8 +497,7 @@ internal class McpHttpClient(
         const val MAX_ERROR_CHARS = 200
         const val MAX_TITLE_CHARS = 160
         const val MAX_DESCRIPTION_CHARS = 2_000
-        const val MAX_DISCOVERED_TOOLS = 128
-        const val MAX_LIST_PAGES = 8
+        const val MAX_LIST_PAGES = 32
         val SUPPORTED_LEGACY_PROTOCOL_VERSIONS = setOf(
             "2024-11-05",
             "2025-03-26",

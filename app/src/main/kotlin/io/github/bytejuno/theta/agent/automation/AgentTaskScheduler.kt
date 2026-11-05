@@ -212,11 +212,21 @@ internal object AgentTaskScheduler {
                             for (field in listOf(
                                 "packageName",
                                 "taskId",
-                                "transport"
+                                "transport",
+                                "ssid",
+                                "deviceName",
+                                "kind",
+                                "mimeType",
+                                "count",
+                                "level",
                             )) if (copy.has(field)) event.put(
                                 field,
                                 copy.optString(field).take(200)
                             )
+                            // 用户主动分享的正文是任务要处理的数据；通知正文等被动来源不进入摘要。
+                            if (type == "shared_content" && copy.has("text")) {
+                                event.put("text", copy.optString("text").take(SHARED_TEXT_CHARS))
+                            }
                             queued = dao.enqueue(
                                 task, AgentTaskRunEntity(
                                     UUID.randomUUID().toString(),
@@ -241,7 +251,10 @@ internal object AgentTaskScheduler {
             val scope = when (type) {
                 "notification_posted", "notification_removed" -> "需要系统通知读取授权；不回放连接前通知，忽略 Eta 自身通知"
                 "app_foreground" -> "需要 Eta 无障碍服务连接；按窗口事件触发"
-                "bluetooth_connected", "bluetooth_disconnected" -> "需要蓝牙连接授权"
+                "bluetooth_connected", "bluetooth_disconnected" -> "需要蓝牙连接授权；filters.deviceName 按设备名精确匹配（不区分大小写）"
+                "network_connected", "network_disconnected" -> "事件监控前台服务运行期间接收；filters.transport 为 wifi/cellular/ethernet，filters.ssid 按 Wi-Fi 名称匹配，需要精确位置授权且系统定位开启"
+                "shared_content" -> "用户通过系统分享发给 Eta 时触发；filters.kind 为 text/link/image/file，filters.textContains 匹配正文；事件附带最多 $SHARED_TEXT_CHARS 字正文，图片和文件只给类型与数量"
+                "battery_level" -> "电量越过阈值时触发一次：{\"type\":\"battery_level\",\"below\":30} 或 above；需要事件监控前台服务"
                 "memory_updated", "task_completed", "task_failed" -> "Eta 本地事件；任务结果触发需要 filters.taskId 防止循环"
                 in AgentTaskRules.timeTypes -> "AlarmManager + JobScheduler；可能延迟，不保证准点"
                 else -> "事件监控前台服务运行期间接收；系统结束服务时不补发"
@@ -255,7 +268,6 @@ internal object AgentTaskScheduler {
             "location_exit",
             "calendar_near",
             "file_changed",
-            "shared_content",
         ).forEach { type ->
             triggers.put(
                 JSONObject().put("type", type).put("available", false)
@@ -264,7 +276,12 @@ internal object AgentTaskScheduler {
         }
         return JSONObject().put("triggers", triggers)
             .put("monitorRunning", AgentTriggerMonitorService.isRunning)
-            .put("conditions", JSONArray(listOf("charging", "unlocked", "networkConnected")))
+            .put("conditions", JSONArray(AgentTaskRules.conditionNames.toList()))
+            .put(
+                "conditionModes",
+                "conditions 中的条件全部满足；conditionsAny（至少两项）中任一满足；两者可同时使用。" +
+                    "任务结果触发不能形成循环，保存时会拒绝。",
+            )
             .put(
                 "timeExamples", JSONArray(
                     listOf(
@@ -291,6 +308,11 @@ internal object AgentTaskScheduler {
         ) require(
             !rule.optJSONObject("filters")?.optString("taskId").isNullOrBlank()
         ) { "任务结果触发必须指定 filters.taskId" }
+        if (!rule.optJSONObject("filters")?.optString("ssid").isNullOrBlank()) {
+            require(
+                context.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+            ) { "按 Wi-Fi 名称过滤需要精确位置授权；也可只用 filters.transport=wifi" }
+        }
     }
 
     private fun available(context: Context, type: String): Boolean = when (type) {
@@ -311,5 +333,8 @@ internal object AgentTaskScheduler {
         "task_completed",
         "task_failed",
         "device_boot",
+        "shared_content",
     )
+
+    private const val SHARED_TEXT_CHARS = 2_000
 }

@@ -183,8 +183,22 @@ internal interface RuntimeRunDao : ChunkedTextDao {
     @Query("SELECT * FROM runtime_inflight_runs ORDER BY created_at ASC")
     suspend fun inFlightRunRows(): List<RuntimeInFlightRunWithEvents>
 
+    /** 分块存储之前写入的超大事件行会让整个查询抛 SQLiteBlobTooBigException（上游 #230），读前先丢弃。 */
+    @Query("DELETE FROM runtime_inflight_events WHERE length(event_json) > :maxChars")
+    suspend fun deleteOversizedInFlightEvents(maxChars: Int)
+
+    @Query("DELETE FROM agent_text_chunks WHERE owner_table = 'runtime_inflight_runs' AND owner_id = :runId AND field LIKE 'event:%'")
+    suspend fun deleteInFlightEventChunks(runId: String)
+
     @Transaction
-    suspend fun inFlightRuns(): List<RuntimeInFlightRunWithEvents> = inFlightRunRows().map { it.copy(run = restoreInFlightRun(it.run)) }
+    suspend fun inFlightRuns(): List<RuntimeInFlightRunWithEvents> {
+        deleteOversizedInFlightEvents(MAX_LEGACY_EVENT_CHARS)
+        return inFlightRunRows().map { stored ->
+            stored.copy(run = restoreInFlightRun(stored.run), events = stored.events.map { event ->
+                event.copy(eventJson = restoreText("runtime_inflight_runs", event.runId, "event:${event.sortIndex}", event.eventJson))
+            })
+        }
+    }
 
     @Upsert
     suspend fun upsertInFlightRunRow(run: RuntimeInFlightRunEntity)
@@ -218,13 +232,21 @@ internal interface RuntimeRunDao : ChunkedTextDao {
     @Transaction
     suspend fun replaceInFlightRun(run: RuntimeInFlightRunEntity) {
         deleteInFlightEvents(run.runId)
+        deleteInFlightEventChunks(run.runId)
         upsertInFlightRun(run)
     }
 
     @Transaction
     suspend fun appendInFlightEvent(event: RuntimeInFlightEventEntity, updatedAt: Long) {
-        insertInFlightEvent(event)
+        insertInFlightEvent(event.copy(
+            eventJson = storeText("runtime_inflight_runs", event.runId, "event:${event.sortIndex}", event.eventJson),
+        ))
         touchInFlightRun(event.runId, updatedAt)
+    }
+
+    companion object {
+        /** 远低于 CursorWindow 2 MB；分块后的引用行只有几十字符。 */
+        const val MAX_LEGACY_EVENT_CHARS = 512 * 1024
     }
 }
 

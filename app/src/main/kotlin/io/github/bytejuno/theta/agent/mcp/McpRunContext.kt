@@ -69,7 +69,7 @@ internal class McpRunSnapshot(
                     configured
                 }
                 server.activeTools.forEach { tool ->
-                    if (projected.size >= MAX_RUN_TOOLS) return@forEach
+                    if (projected.size >= McpToolLimits.MAX_RUN_TOOLS) return@forEach
                     projected += McpRunTool(
                         modelName = modelToolName(server.id, tool.name),
                         server = server,
@@ -94,8 +94,6 @@ internal class McpRunSnapshot(
                 .joinToString("") { byte -> "%02x".format(byte.toInt() and 0xff) }
             return "mcp_${serverPart}_${normalized}_$digest"
         }
-
-        private const val MAX_RUN_TOOLS = 64
     }
 }
 

@@ -114,6 +114,7 @@ internal object AgentModelClient {
         onContextSnapshot: (AgentContextSnapshot) -> Unit = {},
         onTranscript: (List<ConversationMessage>) -> Unit = {},
         restrictedToolNames: Set<String>? = null,
+        lazyToolGroups: Boolean = false,
         onEvent: (AgentEvent) -> Unit = {}
     ): ModelResponse.Text {
         config.validate()
@@ -148,6 +149,10 @@ internal object AgentModelClient {
         val systemCount = AgentPromptBuilder.buildSystemMessages(
             config, skillContext, memoryContext, initialCapabilities.rootAvailable, roleplayContext, executionContext,
         ).length()
+        // 复盘等受限运行的工具名单是精确授权，不参与按需加载。
+        val lazyEnabled = lazyToolGroups && restrictedToolNames == null && !rewriteReply
+        val loadedToolGroups = mutableSetOf<String>()
+        var loadableToolGroups = emptySet<String>()
         fun toolsFor(capabilities: AgentToolCapabilities): JSONArray {
             if (rewriteReply) return JSONArray()
             val tools = AgentToolCatalog.build(
@@ -177,7 +182,10 @@ internal object AgentModelClient {
                 scoped,
                 enabled = restrictedToolNames == null || AgentBatchToolCatalog.NAME in restrictedToolNames,
             )
-            return toolFilter?.invoke(projected) ?: projected
+            val scopedTools = toolFilter?.invoke(projected) ?: projected
+            if (!lazyEnabled) return scopedTools
+            loadableToolGroups = AgentLazyToolGroups.deferredGroups(scopedTools)
+            return AgentLazyToolGroups.project(scopedTools, loadedToolGroups)
         }
         val tools = toolsFor(initialCapabilities)
         onEvent(
@@ -231,7 +239,10 @@ internal object AgentModelClient {
             toolExecutor = AgentModelClient.ToolExecutor { call ->
                 val unavailable = AgentToolRequirements.find(call.name)
                     ?.let { capabilitiesProvider().unavailableCode(call.name) }
-                if (restrictedToolNames != null && call.name !in restrictedToolNames) {
+                if (lazyEnabled && call.name == AgentLazyToolGroups.LOADER_NAME) {
+                    // 下一轮 toolsForRound 会把新分组追加到已发布目录末尾。
+                    ToolResult(AgentLazyToolGroups.load(call.argumentsJson, loadableToolGroups, loadedToolGroups))
+                } else if (restrictedToolNames != null && call.name !in restrictedToolNames) {
                     ToolResult(JSONObject().put("ok", false).put("code", "REVIEW_TOOL_DENIED")
                         .put("message", "此工具不属于自动复盘能力").toString())
                 } else if (unavailable == null) {
