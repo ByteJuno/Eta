@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 上游官方版 Eta
+    url: https://github.com/Mangi-11/Eta/issues
+    about: 官方版本（不带 -fork.N）的问题请反馈到上游。
