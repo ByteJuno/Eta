@@ -928,6 +928,15 @@
   <string name="provider_max_output_tokens">最大輸出 tokens</string>
   <string name="provider_max_output_tokens_hint">留空則使用服務商預設值；思考內容通常也計入這個上限</string>
   <string name="provider_max_output_tokens_invalid">請輸入 1 到 1000000 之間的整數</string>
+  <string name="provider_probe_model">測試此模型</string>
+  <string name="provider_probe_running">測試中…</string>
+  <string name="provider_probe_text">文字回覆</string>
+  <string name="provider_probe_tools">工具呼叫</string>
+  <string name="provider_probe_vision">圖片輸入</string>
+  <string name="provider_probe_supported">可用</string>
+  <string name="provider_probe_unsupported">不支援</string>
+  <string name="provider_probe_failed">請求失敗</string>
+  <string name="provider_probe_skipped">未測試</string>
   <plurals name="provider_models_added">
     <item quantity="other">已新增 %d 個模型</item>
   </plurals>

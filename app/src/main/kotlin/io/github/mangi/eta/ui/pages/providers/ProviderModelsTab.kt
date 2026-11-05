@@ -84,6 +84,7 @@ import io.github.mangi.eta.data.model.ReasoningEffort
 import io.github.mangi.eta.data.repository.ModelRepository
 import io.github.mangi.eta.data.repository.RemoteModelFetcher
 import io.github.mangi.eta.data.repository.RuntimeConfigRepository
+import io.github.mangi.eta.agent.model.ModelCapabilityProbe
 import io.github.mangi.eta.ui.components.EtaChoiceChip
 import io.github.mangi.eta.ui.components.EtaPreferenceGroupItem
 import io.github.mangi.eta.ui.components.MiuixDialogActions
@@ -93,7 +94,9 @@ import io.github.mangi.eta.ui.model.ModelSearchQuery
 import io.github.mangi.eta.ui.model.formatCompactTokenCount
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runInterruptible
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Checkbox
 import top.yukonga.miuix.kmp.basic.FloatingToolbar
@@ -492,6 +495,15 @@ internal fun ProviderModelsTab(
             onDismiss = {
                 if (!isMutatingModel) editingModel = null
             },
+            onProbe = { candidate ->
+                // 取消（关弹窗）时中断阻塞中的请求线程。
+                runInterruptible(Dispatchers.IO) {
+                    ModelCapabilityProbe.run(
+                        RuntimeConfigRepository.buildRuntimeConfig(provider, candidate),
+                        checkVision = true,
+                    )
+                }
+            },
             onSubmit = { updated ->
                 if (isMutatingModel) return@ModelEditDialog
                 scope.launch {
@@ -809,10 +821,14 @@ private fun ModelEditDialog(
     isSaving: Boolean,
     error: String?,
     onDismiss: () -> Unit,
+    onProbe: suspend (Model) -> ModelCapabilityProbe.Report,
     onSubmit: (Model) -> Unit,
     onDelete: (() -> Unit)?,
 ) {
     val context = LocalContext.current
+    val probeScope = rememberCoroutineScope()
+    var probing by remember(model.id, isNew) { mutableStateOf(false) }
+    var probeReport by remember(model.id, isNew) { mutableStateOf<ModelCapabilityProbe.Report?>(null) }
     var displayName by remember(model.id, isNew) { mutableStateOf(model.displayName) }
     var modelId by remember(model.id, isNew) { mutableStateOf(model.modelId) }
     var contextWindowOverrideText by remember(model.id, isNew) {
@@ -1066,13 +1082,34 @@ private fun ModelEditDialog(
                         modifier = Modifier.padding(top = 8.dp),
                     )
                 }
-                if (reasoningOverrideActive || onDelete != null) {
+                probeReport?.let { report -> ModelProbeResults(report) }
+                run {
                     // 文字链接保持轻量外观，但点击区扩展到 40dp 高，避免在弹窗底部误触。
                     Row(
                         modifier = Modifier.padding(top = 4.dp).offset(x = (-4).dp),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
+                        Text(
+                            text = stringResource(if (probing) R.string.provider_probe_running else R.string.provider_probe_model),
+                            style = MiuixTheme.textStyles.body2,
+                            color = MiuixTheme.colorScheme.primary,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(10.dp))
+                                .clickable(enabled = !isSaving && !probing && modelId.isNotBlank() && maxOutputValid) {
+                                    val candidate = updated()
+                                    probing = true
+                                    probeReport = null
+                                    probeScope.launch {
+                                        try {
+                                            probeReport = onProbe(candidate)
+                                        } finally {
+                                            probing = false
+                                        }
+                                    }
+                                }
+                                .padding(horizontal = 8.dp, vertical = 10.dp),
+                        )
                         if (reasoningOverrideActive) {
                             Text(
                                 text = stringResource(R.string.ui_restore_automatic_8d4e1e),
@@ -1114,6 +1151,37 @@ private fun ModelEditDialog(
             onConfirm = { onSubmit(updated()) },
             modifier = Modifier.padding(top = 16.dp),
         )
+    }
+}
+
+@Composable
+private fun ModelProbeResults(report: ModelCapabilityProbe.Report) {
+    Column(modifier = Modifier.fillMaxWidth().padding(start = 4.dp, top = 12.dp)) {
+        listOf(
+            R.string.provider_probe_text to report.text,
+            R.string.provider_probe_tools to report.tools,
+            R.string.provider_probe_vision to report.vision,
+        ).forEach { (label, check) ->
+            val outcome = stringResource(
+                when (check.outcome) {
+                    ModelCapabilityProbe.Outcome.SUPPORTED -> R.string.provider_probe_supported
+                    ModelCapabilityProbe.Outcome.UNSUPPORTED -> R.string.provider_probe_unsupported
+                    ModelCapabilityProbe.Outcome.FAILED -> R.string.provider_probe_failed
+                    ModelCapabilityProbe.Outcome.SKIPPED -> R.string.provider_probe_skipped
+                },
+            )
+            val latency = check.latencyMs?.let { " · ${it} ms" }.orEmpty()
+            val detail = check.detail.takeIf(String::isNotBlank)?.let { "\n$it" }.orEmpty()
+            Text(
+                text = stringResource(label) + "：" + outcome + latency + detail,
+                style = MiuixTheme.textStyles.footnote2,
+                color = when (check.outcome) {
+                    ModelCapabilityProbe.Outcome.FAILED, ModelCapabilityProbe.Outcome.UNSUPPORTED -> StatusError
+                    else -> MiuixTheme.colorScheme.onSurfaceVariantSummary
+                },
+                modifier = Modifier.padding(top = 2.dp),
+            )
+        }
     }
 }
 

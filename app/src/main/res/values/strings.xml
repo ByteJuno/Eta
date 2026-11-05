@@ -950,6 +950,15 @@
   <string name="provider_max_output_tokens">Max output tokens</string>
   <string name="provider_max_output_tokens_hint">Leave blank to use the provider default. Thinking tokens usually count toward this limit.</string>
   <string name="provider_max_output_tokens_invalid">Enter a whole number from 1 to 1000000</string>
+  <string name="provider_probe_model">Test this model</string>
+  <string name="provider_probe_running">Testing…</string>
+  <string name="provider_probe_text">Text reply</string>
+  <string name="provider_probe_tools">Tool calls</string>
+  <string name="provider_probe_vision">Image input</string>
+  <string name="provider_probe_supported">Works</string>
+  <string name="provider_probe_unsupported">Not supported</string>
+  <string name="provider_probe_failed">Request failed</string>
+  <string name="provider_probe_skipped">Not tested</string>
   <plurals name="provider_models_added">
     <item quantity="one">Added %d model</item>
     <item quantity="other">Added %d models</item>
