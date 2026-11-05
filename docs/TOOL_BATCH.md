@@ -94,7 +94,7 @@ Eta 提供 `batch` 工具，在一次模型调用中执行最多八项工具。`
 
 随后补充 OpenAI 请求过滤本地批次检查点字段，重新验证 Batch、会话编解码、Agent loop 与 Chat Completions Provider 共 67 项测试，全部通过；Debug 构建和 Lint 再次通过。Anthropic 与 Responses 原有的逐字段请求投影不带本地检查点元数据。
 
-已通过无线 ADB 覆盖安装到 vivo V2419A（Android 16 / OriginOS），校验手机安装包与本地 Debug APK 的 SHA-256 一致：
+（lejw 分支时期记录）已通过无线 ADB 覆盖安装到 vivo V2419A（Android 16 / OriginOS），校验手机安装包与本地 Debug APK 的 SHA-256 一致：
 
 `58064a2044758fc4c08893f6ee49bb389581df9ca1846d0b73cc83775a3ce66a`
 
