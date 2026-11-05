@@ -250,6 +250,7 @@ private fun SettingsPageContent(
             override fun onServiceStateChanged(service: io.github.libxposed.service.XposedService?) {
                 prefs = Prefs.remotePreferencesForUi(service)
                 prefs?.let { connected ->
+                    enhancementHistory.restoreMissingInto(connected)
                     enhancementHistory.captureConnected(connected)
                     hasConnectedFramework = true
                 }
