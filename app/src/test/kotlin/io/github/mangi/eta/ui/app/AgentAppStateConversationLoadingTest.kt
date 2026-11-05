@@ -72,6 +72,60 @@ class AgentAppStateConversationLoadingTest {
     }
 
     @Test
+    fun disposedInputSavesDraftToItsOriginalConversation() {
+        seed("first" to conversation("first"), "second" to conversation("second"))
+        val state = AgentAppState(context, scope)
+        val firstVersion = state.homeState.inputSyncVersion
+        state.selectConversation("second")
+        awaitLoaded(state, "second")
+        state.saveConversationDraft("first", "first draft", firstVersion)
+        assertEquals("", state.homeState.input)
+        val secondVersion = state.homeState.inputSyncVersion
+        state.selectConversation("first")
+        awaitLoaded(state, "first")
+        state.saveConversationDraft("second", "second draft", secondVersion)
+        assertEquals("first draft", state.homeState.input)
+        state.selectConversation("second")
+        awaitLoaded(state, "second")
+        assertEquals("second draft", state.homeState.input)
+    }
+
+    @Test
+    fun mismatchedSyncVersionCannotOverwriteCurrentDraft() {
+        seed("first" to conversation("first"))
+        val state = AgentAppState(context, scope)
+        val version = state.homeState.inputSyncVersion
+        state.saveConversationDraft("first", "current draft", version)
+        state.saveConversationDraft("first", "stale draft", version - 1)
+        assertEquals("current draft", state.homeState.input)
+        state.saveConversationDraft("first", "", version)
+        assertEquals("", state.homeState.input)
+    }
+
+    @Test
+    fun lateDraftSaveDoesNotOverwriteMessageEditing() {
+        seed("first" to conversation("first"))
+        val state = AgentAppState(context, scope)
+        val version = state.homeState.inputSyncVersion
+        state.beginMessageEdit("first-0")
+        assertTrue(state.homeState.messageEdit != null)
+        val editingText = state.homeState.input
+        state.saveConversationDraft("first", "late draft", version)
+        assertEquals(editingText, state.homeState.input)
+    }
+
+    @Test
+    fun deletedConversationIsNotRecreatedByLateDraftSave() {
+        seed("first" to conversation("first"), "second" to conversation("second"))
+        val state = AgentAppState(context, scope)
+        state.deleteConversation("first")
+        awaitLoaded(state, "second")
+        state.saveConversationDraft("first", "discarded draft", 0)
+        assertEquals("", state.homeState.input)
+        assertEquals(listOf("second"), state.conversationPaneState.conversations.map { it.id })
+    }
+
+    @Test
     fun deletingTheSelectedConversationLoadsTheNextConversation() {
         seed("first" to conversation("first"), "second" to conversation("second"))
         val state = AgentAppState(context, scope)

@@ -159,6 +159,70 @@ class MainActivityLaunchRequestsTest {
         )
     }
 
+    @Test
+    fun attachmentSharePreservesClipTextAndRestoresItWithoutReplay() {
+        val uri = Uri.parse("content://provider/images/123")
+        val share = Intent(Intent.ACTION_SEND).apply {
+            type = "image/jpeg"
+            putExtra(Intent.EXTRA_STREAM, uri)
+            clipData = ClipData.newRawUri("photo", uri).apply {
+                addItem(ClipData.Item("  帮我识别这张图片  "))
+                addItem(ClipData.Item(uri.toString()))
+                addItem(ClipData.Item("帮我识别这张图片"))
+                addItem(ClipData.Item("补充说明"))
+            }
+        }
+        val pending = MainActivityLaunchRequests().accept(share)
+        assertEquals(listOf(uri.toString()), pending.sharedContent?.uris)
+        assertEquals("帮我识别这张图片\n补充说明", pending.sharedContent?.text)
+        assertEquals(pending, MainActivityLaunchRequests.restore(savedState(pending), share))
+        val consumed = pending.copy(sharedContent = null)
+        assertEquals(consumed, MainActivityLaunchRequests.restore(savedState(consumed), share))
+    }
+
+    @Test
+    fun redundantStreamTextDoesNotHideClipCaption() {
+        val uri = Uri.parse("content://provider/images/123")
+        val share = Intent(Intent.ACTION_SEND).apply {
+            type = "image/jpeg"
+            putExtra(Intent.EXTRA_STREAM, uri)
+            putExtra(Intent.EXTRA_TEXT, uri.toString())
+            clipData = ClipData.newRawUri("photo", uri).apply {
+                addItem(ClipData.Item("图片说明"))
+            }
+        }
+        assertEquals("图片说明", MainActivityLaunchRequests().accept(share).sharedContent?.text)
+    }
+
+    @Test
+    fun explicitShareTextTakesPrecedenceOverClipText() {
+        val share = Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_TEXT, "用户提供的正文")
+            clipData = ClipData.newPlainText("text", "剪贴板副本")
+        }
+        assertEquals("用户提供的正文", MainActivityLaunchRequests().accept(share).sharedContent?.text)
+    }
+
+    @Test
+    fun multipleAttachmentShareFallsBackToClipTextWhenExtraIsBlank() {
+        val first = Uri.parse("content://provider/images/123")
+        val second = Uri.parse("content://provider/images/456")
+        val share = Intent(Intent.ACTION_SEND_MULTIPLE).apply {
+            type = "image/*"
+            putParcelableArrayListExtra(Intent.EXTRA_STREAM, arrayListOf(first, second))
+            putExtra(Intent.EXTRA_TEXT, " ")
+            clipData = ClipData.newRawUri("photos", first).apply {
+                addItem(ClipData.Item(second))
+                addItem(ClipData.Item("比较这两张图片"))
+            }
+        }
+        assertEquals(
+            IncomingShareRequest(listOf(first.toString(), second.toString()), "image/*", "比较这两张图片"),
+            MainActivityLaunchRequests().accept(share).sharedContent,
+        )
+    }
+
     private fun savedState(requests: MainActivityLaunchRequests): Bundle {
         val state = Bundle().also(requests::saveTo)
         val parcel = Parcel.obtain()

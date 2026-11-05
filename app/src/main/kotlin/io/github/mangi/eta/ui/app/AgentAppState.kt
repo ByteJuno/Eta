@@ -816,22 +816,14 @@ internal class AgentAppState(
                 val loaded = AgentConversationStore.loadConversation(appContext, conversationId)
                     ?: return@withLock false
                 val current = conversationsById[conversationId] ?: return@withLock false
-                val restored = loaded.copy(
-                    input = current.input,
-                    pendingImages = current.pendingImages,
-                    pendingFileReferences = current.pendingFileReferences,
-                )
+                val restored = loaded.withConversationDraftFrom(current)
                 conversationPersistence.adoptConversation(
                     conversationId, restored, conversationTitles[conversationId].orEmpty(),
                     conversationUpdatedAt[conversationId] ?: 0L,
                     conversationId in conversationPinnedIds,
                 )
                 val latest = conversationsById[conversationId] ?: return@withLock false
-                updateConversation(conversationId, restored.copy(
-                    input = latest.input,
-                    pendingImages = latest.pendingImages,
-                    pendingFileReferences = latest.pendingFileReferences,
-                ), updateTimestamp = false)
+                updateConversation(conversationId, restored.withConversationDraftFrom(latest), updateTimestamp = false)
                 refreshConversationSummaries()
                 true
             }
@@ -1190,6 +1182,10 @@ internal class AgentAppState(
                 terminalToolsEnabled = agentBooleanForUi(Prefs.Keys.AGENT_TERMINAL_TOOLS),
             )
         ) {
+            updateCurrentConversation(
+                homeState.withRejectedSubmission(submittedText),
+                updateTimestamp = false,
+            )
             Toast.makeText(
                 appContext,
                 appContext.getString(R.string.state_ui_file_path_reference_requires_opening_the_termina_deca4c),
@@ -1739,6 +1735,7 @@ internal class AgentAppState(
     }
 
     fun attachImage(uri: String) {
+        val ownerVersion = fileAttachmentOwnerVersion
         scope.launch(Dispatchers.IO) {
             try {
                 val image = AgentImageCodec.fromReference(
@@ -1765,6 +1762,14 @@ internal class AgentAppState(
                     mimeType = image.mimeType,
                 )
                 withContext(Dispatchers.Main) {
+                    if (ownerVersion != fileAttachmentOwnerVersion) {
+                        Toast.makeText(
+                            appContext,
+                            appContext.getString(R.string.state_ui_conversation_switched_selected_path_not_added_5bf91e),
+                            Toast.LENGTH_SHORT,
+                        ).show()
+                        return@withContext
+                    }
                     updateCurrentConversation(homeState.copy(pendingImages = homeState.pendingImages + pending))
                 }
             } finally {
@@ -1862,7 +1867,7 @@ internal class AgentAppState(
             val failures = mutableListOf<AgentFileReferenceGateway.Error>()
             request.uris.forEach { rawUri ->
                 val uri = Uri.parse(rawUri)
-                if (isSharedImageCandidate(uri, request.mimeType, isSingleUri = request.uris.size == 1)) {
+                if (isSharedImageCandidate(uri, request.mimeType)) {
                     val image = AgentImageCodec.fromReference(
                         context = appContext,
                         value = rawUri,
@@ -1936,20 +1941,17 @@ internal class AgentAppState(
     private fun isSharedImageCandidate(
         uri: Uri,
         intentMimeType: String?,
-        isSingleUri: Boolean,
     ): Boolean {
         val resolverType = if (uri.scheme == ContentResolver.SCHEME_CONTENT) {
             runCatching { appContext.contentResolver.getType(uri) }.getOrNull()
         } else {
             null
         }
-        if (resolverType != null && resolverType != "*/*" && resolverType != "application/octet-stream") {
-            return resolverType.startsWith("image/", ignoreCase = true)
-        }
-        val path = uri.lastPathSegment ?: uri.path.orEmpty()
-        val extension = path.substringAfterLast('.', "").lowercase()
-        if (extension in SHARED_IMAGE_EXTENSIONS) return true
-        return isSingleUri && intentMimeType?.startsWith("image/", ignoreCase = true) == true
+        return isSharedImageType(
+            resolverMimeType = resolverType,
+            path = uri.lastPathSegment ?: uri.path.orEmpty(),
+            intentMimeType = intentMimeType,
+        )
     }
 
     private fun resolveSharedFileUri(
@@ -2318,6 +2320,13 @@ internal class AgentAppState(
         if (!outcome.alreadyApplied) updateConversation(conversationId, outcome.state)
     }
 
+    internal fun saveConversationDraft(conversationId: String, text: String, inputSyncVersion: Int) {
+        val state = conversationsById[conversationId] ?: return
+        // 仅保留运行期草稿；数据库不存储输入文字。退出组合只写回原会话，不覆盖更新的业务输入。
+        if (state.messageEdit != null || state.inputSyncVersion != inputSyncVersion || state.input == text) return
+        updateConversation(conversationId, state.copy(input = text), updateTimestamp = false)
+    }
+
     private fun updateCurrentConversation(
         state: AgentChatHomeUiState,
         updateTimestamp: Boolean = true,
@@ -2497,9 +2506,6 @@ internal class AgentAppState(
         const val SYNTHETIC_STATUS_STOPPED = "eta_status:stopped"
         // 数据状态以较粗粒度发布，文字显现由独立的帧时钟连续推进。
         const val STREAM_UI_UPDATE_INTERVAL_MS = 80L
-        private val SHARED_IMAGE_EXTENSIONS = setOf(
-            "jpg", "jpeg", "png", "webp", "gif", "bmp", "heic", "heif",
-        )
 
         fun emptyChatState(thinkingEnabled: Boolean): AgentChatHomeUiState =
             AgentChatHomeUiState(

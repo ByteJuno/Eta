@@ -132,22 +132,19 @@ private fun Intent.toIncomingShareRequest(): IncomingShareRequest? {
     val uris = (streamUris + clipUris)
         .mapNotNull { uri -> uri.toString().takeIf(String::isNotBlank)?.takeIf(::isAcceptableSharedUri) }
         .distinct()
-    val rawText = getCharSequenceExtra(Intent.EXTRA_TEXT)?.toString()?.trim()
+    val text = getCharSequenceExtra(Intent.EXTRA_TEXT)?.toString()?.trim()
         ?.takeIf(String::isNotBlank)
-        ?: if (uris.isEmpty()) {
-            clipData?.let { data ->
-                buildList {
-                    for (index in 0 until data.itemCount) {
-                        data.getItemAt(index)?.text?.toString()?.trim()
-                            ?.takeIf(String::isNotBlank)
-                            ?.let(::add)
-                    }
-                }.joinToString("\n").takeIf(String::isNotBlank)
-            }
-        } else {
-            null
+        ?.takeUnless { it in uris }
+        ?: clipData?.let { data ->
+            buildList {
+                for (index in 0 until data.itemCount) {
+                    data.getItemAt(index)?.text?.toString()?.trim()
+                        ?.takeIf(String::isNotBlank)
+                        ?.takeUnless { it in uris }
+                        ?.let(::add)
+                }
+            }.distinct().joinToString("\n").takeIf(String::isNotBlank)
         }
-    val text = rawText?.takeUnless { it in uris }
     if (uris.isEmpty() && text == null) return null
     return IncomingShareRequest(
         uris = uris,

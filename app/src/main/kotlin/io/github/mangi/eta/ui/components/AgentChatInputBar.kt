@@ -150,6 +150,7 @@ internal fun AgentChatInputBar(
     onAttachFilePath: (String) -> Unit,
     onRemoveFileReference: (String) -> Unit,
     onCancelMessageEdit: () -> Unit,
+    onSaveDraft: (String, Int) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier,
 ) {
     val keyboard = LocalSoftwareKeyboardController.current
@@ -168,6 +169,14 @@ internal fun AgentChatInputBar(
     LaunchedEffect(isEditingMessage, recognitionEnabled) { dictation.cancel() }
     var wasEditingMessage by remember { mutableStateOf(isEditingMessage) }
     var syncedVersion by remember { mutableIntStateOf(inputSyncVersion) }
+    val saveDraft = androidx.compose.runtime.rememberUpdatedState(onSaveDraft)
+    androidx.compose.runtime.DisposableEffect(textFieldState) {
+        onDispose {
+            if (!wasEditingMessage) {
+                saveDraft.value(textFieldState.text.toString(), syncedVersion)
+            }
+        }
+    }
     val canSend = textFieldState.text.isNotBlank() ||
         pendingImages.isNotEmpty() ||
         pendingFileReferences.isNotEmpty()

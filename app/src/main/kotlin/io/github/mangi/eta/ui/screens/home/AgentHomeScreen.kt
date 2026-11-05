@@ -37,6 +37,7 @@ internal fun AgentHomeScreen(
     conversationLoadFailed: Boolean = false,
     historyLoadState: ConversationHistoryLoadState = ConversationHistoryLoadState.Idle,
     isDrawerOpen: Boolean = false,
+    onSaveDraft: (String, String, Int) -> Unit = { _, _, _ -> },
     modifier: Modifier = Modifier,
 ) {
     val virtualDisplayEnabled by remember { io.github.mangi.eta.config.Prefs.virtualDisplayEnabledFlow }
@@ -115,6 +116,9 @@ internal fun AgentHomeScreen(
                         onLoadEarlierMessages = { onAction(AgentHomeAction.LoadEarlierMessages) },
                         onHistoryViewportChanged = { onAction(AgentHomeAction.HistoryViewportChanged(it)) },
                         isDrawerOpen = isDrawerOpen,
+                        onSaveDraft = { text, version ->
+                            conversationKey?.let { onSaveDraft(it, text, version) }
+                        },
                         modifier = Modifier.weight(1f),
                     )
                 }
