@@ -1,5 +1,5 @@
-name: 问题反馈（ByteJuno 定制版）
-description: 只反馈本 fork 构建（版本号带 -fork.N）的问题；上游官方版请到 Mangi-11/Eta 反馈。
+name: 问题反馈（Theta）
+description: 只反馈 ByteJuno/Theta 构建的问题；Theta 使用独立版本号，上游 Eta 官方版请到 Mangi-11/Eta 反馈。
 labels: [bug]
 body:
   - type: markdown
@@ -9,8 +9,8 @@ body:
   - type: input
     id: version
     attributes:
-      label: Eta 版本
-      description: 设置 → 关于 中的完整版本号，例如 3.4.0-fork.3+abc1234
+      label: Theta 版本
+      description: 设置 → 关于 中的完整版本号，例如 0.1.0+abc1234
     validations:
       required: true
   - type: input
