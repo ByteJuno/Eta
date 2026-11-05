@@ -339,6 +339,7 @@ internal class AgentRuntimeRunExecutor(
                 roleplayContext = roleplayContext,
                 rewriteReply = request.operation == AgentRuntimeWire.OP_REWRITE_REPLY,
                 compactOnly = request.operation == AgentRuntimeWire.OP_COMPACT,
+                lazyToolGroups = currentPermissions().lazyToolGroups,
                 onContextSnapshot = { snapshot ->
                     // 压缩会把历史里的记忆写入摘要掉，下一轮需要重新注入最新记忆。
                     ConversationMemoryPins.forget(conversationId)

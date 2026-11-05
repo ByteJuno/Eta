@@ -1124,6 +1124,8 @@
   <string name="context_compaction">上下文压缩</string>
   <string name="context_compact_action">压缩上下文</string>
   <string name="settings_auto_compaction">自动压缩上下文</string>
+  <string name="settings_lazy_tool_groups">按需加载低频工具</string>
+  <string name="settings_lazy_tool_groups_summary">个人数据、自动任务和技能管理工具在模型需要时再加载，每次请求的工具目录约减少四成；少数模型可能想不到先加载。从下一条消息起生效。</string>
   <string name="context_usage_description">上下文用量：%1$s</string>
   <string name="memory_budget_summary">每轮最多注入 %1$s 字符，详细内容由模型按需读取</string>
   <string name="memory_over_limit">已超过 1 MiB 上限，请删减</string>

@@ -310,6 +310,15 @@ private fun SettingsPageContent(
                         icon = Icons.Rounded.Layers,
                         iconTint = SettingsIconColors.Blue,
                     )
+                    SwitchPref(
+                        context = context,
+                        prefs = agentPrefs,
+                        title = stringResource(R.string.settings_lazy_tool_groups),
+                        summary = stringResource(R.string.settings_lazy_tool_groups_summary),
+                        key = Prefs.Keys.AGENT_LAZY_TOOL_GROUPS,
+                        icon = Icons.Rounded.Inventory2,
+                        iconTint = SettingsIconColors.Blue,
+                    )
                     ArrowPreference(
                         title = stringResource(R.string.ui_memory_b55ff5),
                         startAction = {

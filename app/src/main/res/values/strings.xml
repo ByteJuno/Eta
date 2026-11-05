@@ -1240,6 +1240,8 @@
   <string name="context_compaction">Context compaction</string>
   <string name="context_compact_action">Compact context</string>
   <string name="settings_auto_compaction">Automatic context compaction</string>
+  <string name="settings_lazy_tool_groups">Load rarely used tools on demand</string>
+  <string name="settings_lazy_tool_groups_summary">Send personal data, automation and skill admin tools only when the model asks for them. Saves about 40% of the tool list per request; some models may miss a tool. Applies from the next message.</string>
   <string name="voice_audio_permission">请在 Eta 应用权限中允许麦克风，然后重新唤醒；点击麦克风可打开设置</string>
   <string name="voice_use_keyboard">切换键盘输入</string>
   <string name="voice_finish_speech">结束录音并发送</string>
